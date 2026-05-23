@@ -24,8 +24,4 @@ scope = "leanprover-community"
 
 [[lean_lib]]
 name = "Plfl"
-
-# [[lean_exe]]
-# name = "plfl"
-# root = "Main"
-# defaultTarget = true
+precompileModules = true
