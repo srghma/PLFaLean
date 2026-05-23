@@ -164,7 +164,6 @@ def Term.size : Term Γ a → Nat
   | .cons m n => m.size + n.size + 1
   | .caseList l m n => l.size + m.size + n.size + 1
 
-
 namespace Notation
   open Term
 
@@ -500,75 +499,99 @@ inductive Progress (m : ∅ ⊢ a) where
 | step : (m —→ n) → Progress m
 | done : Value m → Progress m
 
-def Progress.progress : (m : ∅ ⊢ a) → Progress m := open Reduce in by
-  intro
-  | ‵ _ => contradiction
-  | ƛ _ => exact .done .lam
-  | l □ m => match progress l with
-    | .step _ => apply step; apply apξ₁; trivial
-    | .done l => match progress m with
-      | .step _ => apply step; apply apξ₂ <;> trivial
-      | .done _ => match l with
-        | .lam => apply step; apply lamβ; trivial
-  | 𝟘 => exact .done V𝟘
-  | ι n => match progress n with
-    | .step _ => apply step; apply succξ; trivial
-    | .done _ => apply done; apply Value.succ; trivial
-  | 𝟘? l m n => match progress l with
-    | .step _ => apply step; apply caseξ; trivial
-    | .done v => match v with
-      | .zero => exact .step zeroβ
-      | .succ _ => apply step; apply succβ; trivial
-  | μ _ => exact .step muβ
-  | .prim n => exact .done (.prim n)
-  | m ⋄ n => match progress m with
-    | .step _ => apply step; apply mulPξ₁; trivial
-    | .done m => match progress n with
-      | .step _ => apply step; apply mulPξ₂; trivial
-      | .done n => match m, n with
-        | .prim m, .prim n => exact .step mulPδ
-  | .let m n => match progress m with
-    | .step _ => apply step; apply letξ; trivial
-    | .done m => apply step; apply letβ; trivial
-  | .prod m n => match progress m with
-    | .step _ => apply step; apply prodξ₁; trivial
-    | .done m => match progress n with
-      | .step _ => apply step; apply prodξ₂; trivial
-      | .done n => exact .done (.prod m n)
-  | .fst n => match progress n with
-    | .step _ => apply step; apply fstξ; trivial
-    | .done n => match n with
-      | .prod v w => apply step; apply fstβ <;> trivial
-  | .snd n => match progress n with
-    | .step _ => apply step; apply sndξ; trivial
-    | .done n => match n with
-      | .prod v w => apply step; apply sndβ <;> trivial
-  | .left n => match progress n with
-    | .step _ => apply step; apply leftξ; trivial
-    | .done n => exact .done (.left n)
-  | .right n => match progress n with
-    | .step _ => apply step; apply rightξ; trivial
-    | .done n => exact .done (.right n)
-  | .caseSum s l r => match progress s with
-    | .step _ => apply step; apply caseSumξ; trivial
-    | .done s => match s with
-      | .left _ => apply step; apply leftβ; trivial
-      | .right _ => apply step; apply rightβ; trivial
-  | .caseVoid v => match progress v with
-    | .step _ => apply step; apply caseVoidξ; trivial
-    | .done _ => contradiction
-  | ◯ => exact .done .unit
-  | .nil => exact .done .nil
-  | .cons m n => match progress m with
-    | .step _ => apply step; apply consξ₁; trivial
-    | .done _ => match progress n with
-      | .step _ => apply step; apply consξ₂; trivial
-      | .done _ => refine .done (.cons ?_ ?_) <;> trivial
-  | .caseList l m n => match progress l with
-    | .step _ => apply step; apply caseListξ; trivial
-    | .done l => match l with
-      | .nil => apply step; exact nilβ
-      | .cons _ w => apply step; exact consβ
+def Progress.progress : (m : ∅ ⊢ a) → Progress m := open Reduce in fun
+  | .var i       => nomatch i          -- Lookup [] a has no constructors
+  | .lam _       => .done .lam
+  | .ap l arg    =>
+      match progress l with
+      | .step r  => .step (apξ₁ r)
+      | .done vl =>
+          match progress arg with
+          | .step r  => .step (apξ₂ vl r)
+          | .done va =>
+              match vl with
+              | .lam => .step (lamβ va)
+  | .zero        => .done .zero
+  | .succ n      =>
+      match progress n with
+      | .step r  => .step (succξ r)
+      | .done vn => .done (.succ vn)
+  | .case l m n  =>
+      match progress l with
+      | .step r  => .step (caseξ r)
+      | .done vl =>
+          match vl with
+          | .zero   => .step zeroβ
+          | .succ v => .step (succβ v)
+  | .mu _        => .step muβ
+  | .prim n      => .done (.prim n)
+  | .mulP m n    =>
+      match progress m with
+      | .step r  => .step (mulPξ₁ r)
+      | .done vm =>
+          match progress n with
+          | .step r  => .step (mulPξ₂ r)
+          | .done vn =>
+              match vm, vn with
+              | .prim _, .prim _ => .step mulPδ
+  | .let m n     =>
+      match progress m with
+      | .step r  => .step (letξ r)
+      | .done vm => .step (letβ vm)
+  | .prod m n    =>
+      match progress m with
+      | .step r  => .step (prodξ₁ r)
+      | .done vm =>
+          match progress n with
+          | .step r  => .step (prodξ₂ r)
+          | .done vn => .done (.prod vm vn)
+  | .fst n       =>
+      match progress n with
+      | .step r  => .step (fstξ r)
+      | .done vn =>
+          match vn with
+          | .prod vv vw => .step (fstβ vv vw)
+  | .snd n       =>
+      match progress n with
+      | .step r  => .step (sndξ r)
+      | .done vn =>
+          match vn with
+          | .prod vv vw => .step (sndβ vv vw)
+  | .left n      =>
+      match progress n with
+      | .step r  => .step (leftξ r)
+      | .done vn => .done (.left vn)
+  | .right n     =>
+      match progress n with
+      | .step r  => .step (rightξ r)
+      | .done vn => .done (.right vn)
+  | .caseSum s lc rc =>
+      match progress s with
+      | .step r  => .step (caseSumξ r)
+      | .done vs =>
+          match vs with
+          | .left  vv => .step (leftβ vv)
+          | .right vv => .step (rightβ vv)
+  | .caseVoid v  =>
+      match progress v with
+      | .step r  => .step (caseVoidξ r)
+      | .done vv => nomatch vv   -- no Value constructor produces Ty.void
+  | .unit        => .done .unit
+  | .nil         => .done .nil
+  | .cons m n    =>
+      match progress m with
+      | .step r  => .step (consξ₁ r)
+      | .done vm =>
+          match progress n with
+          | .step r  => .step (consξ₂ r)
+          | .done vn => .done (.cons vm vn)
+  | .caseList l m n =>
+      match progress l with
+      | .step r  => .step (caseListξ r)
+      | .done vl =>
+          match vl with
+          | .nil      => .step nilβ
+          | .cons _ _ => .step consβ
 
 open Progress (progress)
 
