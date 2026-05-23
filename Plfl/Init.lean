@@ -1,6 +1,6 @@
 module
 
-public import Mathlib.Tactic
+public import Mathlib.Logic.IsEmpty.Defs
 
 @[expose] public section
 
@@ -11,21 +11,27 @@ syntax "is_empty" : tactic
 macro_rules | `(tactic| is_empty) => `(tactic| apply Function.isEmpty (β := False))
 
 /--
-`Decidable'` is like `Decidable`, but allows arbitrary sorts so it can hold data.
+`PDecidable` is like `Decidable`, but allows arbitrary sorts so it can hold data.
 -/
-class inductive Decidable' (α : Sort u) where
+class inductive PDecidable (α : Sort _) where
   /-- Proves that `α` is empty by supplying a proof of `IsEmpty α` -/
-  | isFalse (h : IsEmpty α) : Decidable' α
+  | isFalse (h : IsEmpty α) : PDecidable α
   /-- Proves that `α` is inhabited by supplying a datum of `α` -/
-  | isTrue (h : α) : Decidable' α
+  | isTrue (h : α) : PDecidable α
 
-namespace Decidable'
-  def toDecidable : Decidable' α → Decidable (Nonempty α)
+namespace PDecidable
+  def toDecidable : PDecidable α → Decidable (Nonempty α)
   | .isTrue a => .isTrue ⟨a⟩
   | .isFalse na => .isFalse (fun ⟨a⟩ => na.false a)
-end Decidable'
 
-instance [Repr α] : Repr (Decidable' α) where
+  /-- Safely extracts the data, but forces you to prove it isn't `isFalse` first. -/
+  def get (d : PDecidable α) (h : Nonempty α) : α :=
+    match d with
+    | .isTrue a => a
+    | .isFalse na => False.elim (h.elim na.false)
+end PDecidable
+
+instance [Repr α] : Repr (PDecidable α) where
   reprPrec da n := match da with
   | .isTrue a => ".isTrue " ++ reprPrec a n
   | .isFalse _ => ".isFalse _"

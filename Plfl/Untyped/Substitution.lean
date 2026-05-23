@@ -4,7 +4,9 @@ module
 
 public import Plfl.Init
 public import Plfl.Untyped
-
+import Batteries.Tactic.Init
+import Batteries.Logic
+import Mathlib.Tactic
 @[expose] public section
 
 namespace Substitution
