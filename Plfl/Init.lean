@@ -11,20 +11,24 @@ syntax "is_empty" : tactic
 macro_rules | `(tactic| is_empty) => `(tactic| apply Function.isEmpty (β := False))
 
 /--
-`Decidable'` is like `Decidable`, but allows arbitrary sorts.
+`Decidable'` is like `Decidable`, but allows arbitrary sorts so it can hold data.
 -/
-abbrev Decidable' α := IsEmpty α ⊕' α
+class inductive Decidable' (α : Sort u) where
+  /-- Proves that `α` is empty by supplying a proof of `IsEmpty α` -/
+  | isFalse (h : IsEmpty α) : Decidable' α
+  /-- Proves that `α` is inhabited by supplying a datum of `α` -/
+  | isTrue (h : α) : Decidable' α
 
 namespace Decidable'
-  def toDecidable : Decidable' α → Decidable (Nonempty α) := by intro
-  | .inr a => right; exact ⟨a⟩
-  | .inl na => left; simpa
+  def toDecidable : Decidable' α → Decidable (Nonempty α)
+  | .isTrue a => .isTrue ⟨a⟩
+  | .isFalse na => .isFalse (fun ⟨a⟩ => na.false a)
 end Decidable'
 
 instance [Repr α] : Repr (Decidable' α) where
   reprPrec da n := match da with
-  | .inr a => ".inr " ++ reprPrec a n
-  | .inl _ => ".inl _"
+  | .isTrue a => ".isTrue " ++ reprPrec a n
+  | .isFalse _ => ".isFalse _"
 
 theorem congr_arg₃
 (f : α → β → γ → δ) {x x' : α} {y y' : β} {z z' : γ}

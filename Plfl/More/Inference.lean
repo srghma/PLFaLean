@@ -309,16 +309,16 @@ lemma Lookup.empty_ext_empty
   intro n ai; is_empty; intro ⟨a, i⟩; apply ai.false; exists a
   cases i <;> trivial
 
-def Lookup.lookup (Γ : Context) (x : Sym) : Decidable' (Σ a, Γ ∋ x ⦂ a) :=
+abbrev Lookup.lookup (Γ : Context) (x : Sym) : Decidable' (Σ a, Γ ∋ x ⦂ a) :=
   match Γ with
-  | [] => .inl (by is_empty; intro ⟨_, h⟩; cases h) -- Helper for False case
+  | [] => .isFalse (by is_empty; intro ⟨_, h⟩; cases h) -- Helper for False case
   | ⟨y, b⟩ :: Γ =>
     if h : x = y then
-      .inr ⟨b, h ▸ .z⟩
+      .isTrue ⟨b, h ▸ .z⟩
     else
       match lookup Γ x with
-      | .inr ⟨a, i⟩ => .inr ⟨a, .s h i⟩
-      | .inl n => .inl (Lookup.empty_ext_empty h n)
+      | .isTrue ⟨a, i⟩ => .isTrue ⟨a, .s h i⟩
+      | .isFalse n => .isFalse (Lookup.empty_ext_empty h n)
 
 -- Helper to step the lookup when we know x ≠ y
 lemma Lookup.step_nonempty (h : x ≠ y) :
@@ -371,93 +371,93 @@ protected theorem Ty.prod_inj_fst : Ty.prod a b = Ty.prod c d → a = c := fun |
 protected theorem Ty.prod_inj_snd : Ty.prod a b = Ty.prod c d → b = d := fun | rfl => rfl
 
 mutual
-  def TermS.infer (m : TermS) (Γ : Context) : Decidable' (Σ a, Γ ⊢ m ⇡ a) :=
+  abbrev TermS.infer (m : TermS) (Γ : Context) : Decidable' (Σ a, Γ ⊢ m ⇡ a) :=
     match m with
     | .var x =>
         match Lookup.lookup Γ x with
-        | .inr ⟨a, i⟩ => .inr ⟨a, .var i⟩
-        | .inl ne    => .inl ⟨fun ⟨_, .var i⟩ => ne.false ⟨_, i⟩⟩
+        | .isTrue ⟨a, i⟩ => .isTrue ⟨a, .var i⟩
+        | .isFalse ne    => .isFalse ⟨fun ⟨_, .var i⟩ => ne.false ⟨_, i⟩⟩
     | .ap l m =>
         match TermS.infer l Γ with
-        | .inr ⟨.fn a b, tab⟩ =>
+        | .isTrue ⟨.fn a b, tab⟩ =>
             match TermI.infer m Γ a with
-            | .inr ta => .inr ⟨b, .ap tab ta⟩
-            | .inl ne => .inl ⟨fun ⟨_, .ap tl tm⟩ =>
+            | .isTrue ta => .isTrue ⟨b, .ap tab ta⟩
+            | .isFalse ne => .isFalse ⟨fun ⟨_, .ap tl tm⟩ =>
                 ne.false ((Ty.fn_inj_dom (tab.unique tl)) ▸ tm)⟩
-        | .inr ⟨.nat,      tab⟩ => .inl ⟨fun ⟨_, .ap tl _⟩ => nomatch tab.unique tl⟩
-        | .inr ⟨.prod _ _, tab⟩ => .inl ⟨fun ⟨_, .ap tl _⟩ => nomatch tab.unique tl⟩
-        | .inl ne               => .inl ⟨fun ⟨_, .ap tl _⟩ => ne.false ⟨_, tl⟩⟩
+        | .isTrue ⟨.nat,      tab⟩ => .isFalse ⟨fun ⟨_, .ap tl _⟩ => nomatch tab.unique tl⟩
+        | .isTrue ⟨.prod _ _, tab⟩ => .isFalse ⟨fun ⟨_, .ap tl _⟩ => nomatch tab.unique tl⟩
+        | .isFalse ne               => .isFalse ⟨fun ⟨_, .ap tl _⟩ => ne.false ⟨_, tl⟩⟩
     | .prod m n =>
         match TermS.infer m Γ, TermS.infer n Γ with
-        | .inr ⟨a, tm⟩, .inr ⟨b, tn⟩ => .inr ⟨a * b, tm.prod tn⟩
-        | .inr _,        .inl ne       => .inl ⟨fun ⟨_, .prod _ tn⟩ => ne.false ⟨_, tn⟩⟩
-        | .inl ne,       _             => .inl ⟨fun ⟨_, .prod tm _⟩ => ne.false ⟨_, tm⟩⟩
+        | .isTrue ⟨a, tm⟩, .isTrue ⟨b, tn⟩ => .isTrue ⟨a * b, tm.prod tn⟩
+        | .isTrue _,        .isFalse ne       => .isFalse ⟨fun ⟨_, .prod _ tn⟩ => ne.false ⟨_, tn⟩⟩
+        | .isFalse ne,      _             => .isFalse ⟨fun ⟨_, .prod tm _⟩ => ne.false ⟨_, tm⟩⟩
     | .syn m a =>
         match TermI.infer m Γ a with
-        | .inr t  => .inr ⟨a, .syn t⟩
-        | .inl ne => .inl ⟨fun ⟨_, .syn t'⟩ => ne.false t'⟩
+        | .isTrue t  => .isTrue ⟨a, .syn t⟩
+        | .isFalse ne => .isFalse ⟨fun ⟨_, .syn t'⟩ => ne.false t'⟩
 
-  def TermI.infer (m : TermI) (Γ : Context) (a : Ty) : Decidable' (Γ ⊢ m ⇣ a) :=
+  abbrev TermI.infer (m : TermI) (Γ : Context) (a : Ty) : Decidable' (Γ ⊢ m ⇣ a) :=
     match m with
     | .lam x n =>
         match a with
         | .fn a b =>
             match TermI.infer n (Γ‚ x ⦂ a) b with
-            | .inr t  => .inr (.lam t)
-            | .inl ne => .inl ⟨fun (.lam t) => ne.false t⟩
-        | .nat      => .inl ⟨fun h => nomatch h⟩
-        | .prod _ _ => .inl ⟨fun h => nomatch h⟩
+            | .isTrue t  => .isTrue (.lam t)
+            | .isFalse ne => .isFalse ⟨fun (.lam t) => ne.false t⟩
+        | .nat      => .isFalse ⟨fun h => nomatch h⟩
+        | .prod _ _ => .isFalse ⟨fun h => nomatch h⟩
     | .zero =>
         match a with
-        | .nat      => .inr .zero
-        | .fn _ _   => .inl ⟨fun h => nomatch h⟩
-        | .prod _ _ => .inl ⟨fun h => nomatch h⟩
+        | .nat      => .isTrue .zero
+        | .fn _ _   => .isFalse ⟨fun h => nomatch h⟩
+        | .prod _ _ => .isFalse ⟨fun h => nomatch h⟩
     | .succ n =>
         match a with
         | .nat =>
             match TermI.infer n Γ .nat with
-            | .inr t  => .inr (.succ t)
-            | .inl ne => .inl ⟨fun (.succ t) => ne.false t⟩
-        | .fn _ _   => .inl ⟨fun h => nomatch h⟩
-        | .prod _ _ => .inl ⟨fun h => nomatch h⟩
+            | .isTrue t  => .isTrue (.succ t)
+            | .isFalse ne => .isFalse ⟨fun (.succ t) => ne.false t⟩
+        | .fn _ _   => .isFalse ⟨fun h => nomatch h⟩
+        | .prod _ _ => .isFalse ⟨fun h => nomatch h⟩
     | .case l mz x ms =>
         match TermS.infer l Γ with
-        | .inr ⟨.nat, tl⟩ =>
+        | .isTrue ⟨.nat, tl⟩ =>
             match TermI.infer mz Γ a with
-            | .inr tm =>
+            | .isTrue tm =>
                 match TermI.infer ms (Γ‚ x ⦂ .nat) a with
-                | .inr tn => .inr (.case tl tm tn)
-                | .inl ne => .inl ⟨fun (.case _ _ tn') => ne.false tn'⟩
-            | .inl ne => .inl ⟨fun (.case _ tm' _) => ne.false tm'⟩
-        | .inr ⟨.fn _ _,   tl⟩ => .inl ⟨fun (.case tl' _ _) => nomatch tl.unique tl'⟩
-        | .inr ⟨.prod _ _, tl⟩ => .inl ⟨fun (.case tl' _ _) => nomatch tl.unique tl'⟩
-        | .inl ne               => .inl ⟨fun (.case tl' _ _) => ne.false ⟨_, tl'⟩⟩
+                | .isTrue tn => .isTrue (.case tl tm tn)
+                | .isFalse ne => .isFalse ⟨fun (.case _ _ tn') => ne.false tn'⟩
+            | .isFalse ne => .isFalse ⟨fun (.case _ tm' _) => ne.false tm'⟩
+        | .isTrue ⟨.fn _ _,   tl⟩ => .isFalse ⟨fun (.case tl' _ _) => nomatch tl.unique tl'⟩
+        | .isTrue ⟨.prod _ _, tl⟩ => .isFalse ⟨fun (.case tl' _ _) => nomatch tl.unique tl'⟩
+        | .isFalse ne               => .isFalse ⟨fun (.case tl' _ _) => ne.false ⟨_, tl'⟩⟩
     | .mu x n =>
         match TermI.infer n (Γ‚ x ⦂ a) a with
-        | .inr t  => .inr (.mu t)
-        | .inl ne => .inl ⟨fun (.mu t) => ne.false t⟩
+        | .isTrue t  => .isTrue (.mu t)
+        | .isFalse ne => .isFalse ⟨fun (.mu t) => ne.false t⟩
     | .fst p =>
         match TermS.infer p Γ with
-        | .inr ⟨.prod b _, tp⟩ =>
-            if h : b = a then .inr (h ▸ .fst tp)
-            else .inl ⟨fun (.fst tp') => h (Ty.prod_inj_fst (tp.unique tp'))⟩
-        | .inr ⟨.nat,      tp⟩ => .inl ⟨fun (.fst tp') => nomatch tp.unique tp'⟩
-        | .inr ⟨.fn _ _,   tp⟩ => .inl ⟨fun (.fst tp') => nomatch tp.unique tp'⟩
-        | .inl ne               => .inl ⟨fun (.fst tp') => ne.false ⟨_, tp'⟩⟩
+        | .isTrue ⟨.prod b _, tp⟩ =>
+            if h : b = a then .isTrue (h ▸ .fst tp)
+            else .isFalse ⟨fun (.fst tp') => h (Ty.prod_inj_fst (tp.unique tp'))⟩
+        | .isTrue ⟨.nat,      tp⟩ => .isFalse ⟨fun (.fst tp') => nomatch tp.unique tp'⟩
+        | .isTrue ⟨.fn _ _,   tp⟩ => .isFalse ⟨fun (.fst tp') => nomatch tp.unique tp'⟩
+        | .isFalse ne               => .isFalse ⟨fun (.fst tp') => ne.false ⟨_, tp'⟩⟩
     | .snd p =>
         match TermS.infer p Γ with
-        | .inr ⟨.prod _ c, tp⟩ =>
-            if h : c = a then .inr (h ▸ .snd tp)
-            else .inl ⟨fun (.snd tp') => h (Ty.prod_inj_snd (tp.unique tp'))⟩
-        | .inr ⟨.nat,      tp⟩ => .inl ⟨fun (.snd tp') => nomatch tp.unique tp'⟩
-        | .inr ⟨.fn _ _,   tp⟩ => .inl ⟨fun (.snd tp') => nomatch tp.unique tp'⟩
-        | .inl ne               => .inl ⟨fun (.snd tp') => ne.false ⟨_, tp'⟩⟩
+        | .isTrue ⟨.prod _ c, tp⟩ =>
+            if h : c = a then .isTrue (h ▸ .snd tp)
+            else .isFalse ⟨fun (.snd tp') => h (Ty.prod_inj_snd (tp.unique tp'))⟩
+        | .isTrue ⟨.nat,      tp⟩ => .isFalse ⟨fun (.snd tp') => nomatch tp.unique tp'⟩
+        | .isTrue ⟨.fn _ _,   tp⟩ => .isFalse ⟨fun (.snd tp') => nomatch tp.unique tp'⟩
+        | .isFalse ne               => .isFalse ⟨fun (.snd tp') => ne.false ⟨_, tp'⟩⟩
     | .inh m =>
         match TermS.infer m Γ with
-        | .inr ⟨b, tm⟩ =>
-            if h : b = a then .inr (h ▸ .inh tm)
-            else .inl ⟨fun (.inh tm') => h (tm.unique tm')⟩
-        | .inl ne => .inl ⟨fun (.inh tm') => ne.false ⟨_, tm'⟩⟩
+        | .isTrue ⟨b, tm⟩ =>
+            if h : b = a then .isTrue (h ▸ .inh tm)
+            else .isFalse ⟨fun (.inh tm') => h (tm.unique tm')⟩
+        | .isFalse ne => .isFalse ⟨fun (.inh tm') => ne.false ⟨_, tm'⟩⟩
 end
 
 -- Helper theorems to handle mapping inside the Nonempty wrapper safely
@@ -589,7 +589,7 @@ abbrev fourTy : Γ ⊢ four ⇡ ℕt := open TyS TyI Lookup in by
     addTy, twoTy]
   <;> elem
 
-example : four.infer ∅ = .inr ⟨ℕt, fourTy⟩ := by rfl
+example : four.infer ∅ = .isTrue ⟨ℕt, fourTy⟩ := by rfl
 
 abbrev four'Ty : Γ ⊢ four' ⇡ ℕt := open TyS TyI Lookup in by
   repeat apply_rules
@@ -598,7 +598,7 @@ abbrev four'Ty : Γ ⊢ four' ⇡ ℕt := open TyS TyI Lookup in by
     addCTy, twoCTy]
   <;> elem
 
-example : four'.infer ∅ = .inr ⟨ℕt, four'Ty⟩ := by rfl
+example : four'.infer ∅ = .isTrue ⟨ℕt, four'Ty⟩ := by rfl
 
 abbrev four'': TermS := mul □ two □ two
 
@@ -609,7 +609,7 @@ abbrev four''Ty : Γ ⊢ four'' ⇡ ℕt := open TyS TyI Lookup in by
     mulTy, twoTy]
   <;> elem
 
-example : four''.infer ∅ = .inr ⟨ℕt, four''Ty⟩ := by rfl
+example : four''.infer ∅ = .isTrue ⟨ℕt, four''Ty⟩ := by rfl
 
 -- https://plfa.github.io/Inference/#testing-the-error-cases
 
@@ -618,7 +618,7 @@ This didn't work for before due to limitations with mutual recursions.
 See: <https://leanprover.zulipchat.com/#narrow/stream/113489-new-members/topic/.E2.9C.94.20Proof.20of.20an.20inductive's.20variant.3F/near/358901115>
 -/
 
-example := show ((ƛ "x" : ‵"y").the (ℕt =⇒ ℕt)).infer ∅ = .inl _ by rfl
+example := show ((ƛ "x" : ‵"y").the (ℕt =⇒ ℕt)).infer ∅ = .isFalse _ by rfl
 
 /-
 This didn't work either, probably due to similar reasons...
@@ -631,67 +631,67 @@ example := let m := (ƛ "x" : ‵"y").the (ℕt =⇒ ℕt); show IsEmpty (Σ a, 
 
 -- Unbound variable:
 /--
-info: .inl _
+info: .isFalse _
 -/
 #guard_msgs in #eval ((ƛ "x" : ‵"y").the (ℕt =⇒ ℕt)).infer ∅
 
 -- Argument in application is ill typed:
 /--
-info: .inl _
+info: .isFalse _
 -/
 #guard_msgs in #eval (add □ succC).infer ∅
 
 -- Function in application is ill typed:
 /--
-info: .inl _
+info: .isFalse _
 -/
 #guard_msgs in #eval (add □ succC □ two).infer ∅
 
 -- Function in application has type natural:
 /--
-info: .inl _
+info: .isFalse _
 -/
 #guard_msgs in #eval (two.the ℕt □ two).infer ∅
 
 -- Abstraction inherits type natural:
 /--
-info: .inl _
+info: .isFalse _
 -/
 #guard_msgs in #eval (twoC.the ℕt).infer ∅
 
 -- Zero inherits a function type:
 /--
-info: .inl _
+info: .isFalse _
 -/
 #guard_msgs in #eval (𝟘.the (ℕt =⇒ ℕt)).infer ∅
 
 -- Successor inherits a function type:
 /--
-info: .inl _
+info: .isFalse _
 -/
 #guard_msgs in #eval (two.the (ℕt =⇒ ℕt)).infer ∅
 
 -- Successor of an ill-typed term:
 /--
-info: .inl _
+info: .isFalse _
 -/
 #guard_msgs in #eval ((ι twoC).the ℕt).infer ∅
 
 -- Case of a term with a function type:
 /--
-info: .inl _
+info: .isFalse _
 -/
 #guard_msgs in #eval ((𝟘? twoC.the Ch [zero: 𝟘 |succ "x" : ‵"x"]).the ℕt).infer ∅
 
 -- Case of an ill-typed term:
 /--
-info: .inl _
+info: .isFalse _
 -/
 #guard_msgs in #eval ((𝟘? twoC.the ℕt [zero: 𝟘 |succ "x" : ‵"x"]).the ℕt).infer ∅
 
 -- Inherited and synthesized types disagree in a switch:
 /--
-info: .inl _
+info: .isFalse _
 -/
 #guard_msgs in #eval ((ƛ "x" : ‵"x").the (ℕt =⇒ ℕt =⇒ ℕt)).infer ∅
 
@@ -730,7 +730,7 @@ end
 example : fourTy.erase (Γ := ∅) = More.Term.four := by rfl
 
 -- https://plfa.github.io/Inference/#exercise-inference-multiplication-recommended
-example : mul.infer ∅ = .inr ⟨ℕt =⇒ ℕt =⇒ ℕt, mulTy⟩ := by rfl
+example : mul.infer ∅ = .isTrue ⟨ℕt =⇒ ℕt =⇒ ℕt, mulTy⟩ := by rfl
 
 -- ! BOOM! The commented lines below were very CPU/RAM-intensive, and might even make LEAN4 leak memory!
 example : mulTy.erase (Γ := ∅) = More.Term.mul := by rfl
