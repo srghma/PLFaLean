@@ -2,7 +2,9 @@ module
 
 -- https://plfa.github.io/Inference/
 
-public meta import Plfl.Init
+import Plfl.Init.Tactics
+meta import Plfl.Init.PDecidable
+public import Plfl.Init.PDecidable
 public import Plfl.More
 public import Mathlib.Tactic
 
@@ -44,7 +46,7 @@ end Context
 namespace Notation
   open Context
 
- -- The goal is to make `_‚_⦂_` work like an `infixl`.
+  -- The goal is to make `_‚_⦂_` work like an `infixl`.
   -- https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html#From-Precedence-to-Binding-Power
   -- `‚` is not a comma! See: <https://www.compart.com/en/unicode/U+201A>
   notation:50 c "‚ " s:51 " ⦂ " t:51 => extend c s t

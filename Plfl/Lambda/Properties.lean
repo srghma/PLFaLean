@@ -2,7 +2,7 @@ module
 
 -- https://plfa.github.io/Properties/
 
-public meta import Plfl.Init
+import Plfl.Init.Tactics
 public meta import Plfl.Lambda
 import Plfl.Lambda
 import Mathlib.Tactic.Basic
