@@ -2,7 +2,6 @@ module
 
 -- https://plfa.github.io/Substitution/#plfa_plfa-part2-Substitution-2341
 
-public import Plfl.Init
 public import Plfl.Untyped
 import Batteries.Tactic.Init
 import Batteries.Logic

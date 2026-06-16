@@ -2,7 +2,7 @@ module
 
 -- https://plfa.github.io/Properties/
 
-public meta import Plfl.Init
+import Plfl.Init.Tactics
 public meta import Plfl.Lambda
 import Plfl.Lambda
 import Mathlib.Tactic.Basic
@@ -369,7 +369,7 @@ section subject_expansion
     have := f 𝟘 ℕt illCase tyZero zeroβ
     exact nty_ill.false this.some
 
-example : IsEmpty (∀ {n t m}, ∅ ⊢ n ⦂ t → (m —→ n) → ∅ ⊢ m ⦂ t) := by
+  example : IsEmpty (∀ {n t m}, ∅ ⊢ n ⦂ t → (m —→ n) → ∅ ⊢ m ⦂ t) := by
     by_contra f
     simp_all only [isEmpty_pi, not_exists, not_isEmpty_iff]
     let illAp := (ƛ "x" : 𝟘) □ illLam

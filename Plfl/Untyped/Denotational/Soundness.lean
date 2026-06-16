@@ -2,7 +2,6 @@ module
 
 -- https://plfa.github.io/Soundness/
 
-public import Plfl.Init
 public import Plfl.Untyped.Denotational.Compositional
 
 @[expose] public section
