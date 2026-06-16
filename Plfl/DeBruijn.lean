@@ -160,6 +160,9 @@ def rename : (∀ {a}, Γ ∋ a → Δ ∋ a) → Γ ⊢ a → Δ ⊢ a := by
     · refine rename ?_ n; exact ext ρ
   | μ n => refine .mu ?_; refine rename ?_ n; exact ext ρ
 
+#print Term.brecOn
+#print rename
+
 example
 : let m : ∅‚ ℕt =⇒ ℕt ⊢ ℕt =⇒ ℕt := ƛ (#1 $ #1 $ #0)
   let m' : ∅‚ ℕt =⇒ ℕt‚ ℕt ⊢ ℕt =⇒ ℕt := ƛ (#2 $ #2 $ #0)

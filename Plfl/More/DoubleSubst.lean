@@ -345,6 +345,10 @@ theorem subst_subst_comp
       congr; ext _ t; rw [Function.comp_apply, exts_subst_comp t]
       congr; ext _ t; rw [Function.comp_apply, exts_subst_comp t]
 
+#print subst_subst_comp
+#print subst_subst_comp._f
+#print Term.below
+
 theorem double_subst
 : subst₂ (v : Γ ⊢ a) (w : Γ ⊢ b) (n : Γ‚ a‚ b ⊢ c)
 = n⟦rename .s w⟧⟦v⟧
