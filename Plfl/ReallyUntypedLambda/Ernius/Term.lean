@@ -1,0 +1,392 @@
+import Mathlib.Data.List.Basic
+import Mathlib.Data.Nat.Basic
+import Plfl.ReallyUntypedLambda.Ernius.Atom
+import Plfl.ReallyUntypedLambda.Ernius.Chi
+
+namespace Term
+
+set_option quotPrecheck false
+
+inductive Λ where
+  | v   : Atom → Λ
+  | app : Λ → Λ → Λ
+  | lam : Atom → Λ → Λ
+
+infixl:70 " ∙ " => Λ.app
+notation "ƛ " a:max M:max => Λ.lam a M
+
+open Λ in
+def size : Λ → Nat
+  | v _   => 1
+  | M ∙ N => size M + size N
+  | ƛ _ M => 1 + size M
+
+notation "|" M "|" => size M
+
+open Λ in
+theorem size_pos {M : Λ} : 0 < |M| := by
+  induction M with
+  | v _ => simp [size]
+  | app M N ihM ihN => simp [size]; omega
+  | lam a M ih => simp [size]; omega
+
+-- theorem «lemma|va|» {N : Λ} (h : |N| ≤ 1) : ∃ a, N = v a := by
+--   cases N with
+--   | v a => exact ⟨a, rfl⟩
+--   | app M N =>
+--     have h1 := «lemma|M|>0» (M := M)
+--     have h2 := «lemma|M|>0» (M := N)
+--     change size M + size N ≤ 1 at h
+--     omega
+--   | lam a M =>
+--     have h1 := «lemma|M|>0» (M := M)
+--     change 1 + size M ≤ 1 at h
+--     omega
+--
+-- inductive InT (a : Atom) : Λ → Prop where
+--   | in_v     : InT a (v a)
+--   | in_app_r {M N : Λ} : InT a N → InT a (M ∙ N)
+--   | in_app_l {M N : Λ} : InT a M → InT a (M ∙ N)
+--   | in_lam_r {b : Atom} {M : Λ} : InT a M → InT a (ƛ b M)
+--   | in_lam_l {M : Λ} : InT a (ƛ a M)
+--
+-- inductive NotInT (a : Atom) : Λ → Prop where
+--   | not_in_v   {b : Atom} : b ≠ a → NotInT a (v b)
+--   | not_in_app {M N : Λ}  : NotInT a M → NotInT a N → NotInT a (M ∙ N)
+--   | not_in_lam {b : Atom} {M : Λ} : b ≠ a → NotInT a M → NotInT a (ƛ b M)
+--
+-- notation:50 a "∈ₜ" M => InT a M
+-- notation:50 a "∉ₜ" M => NotInT a M
+--
+-- inductive Fresh (a : Atom) : Λ → Prop where
+--   | fresh_v      {b : Atom} : b ≠ a → Fresh a (v b)
+--   | fresh_app    {M N : Λ}  : Fresh a M → Fresh a N → Fresh a (M ∙ N)
+--   | fresh_lam_eq {M : Λ}     : Fresh a (ƛ a M)
+--   | fresh_lam    {b : Atom} {M : Λ} : Fresh a M → Fresh a (ƛ b M)
+--
+-- inductive Free (x : Atom) : Λ → Prop where
+--   | free_v     : Free x (v x)
+--   | free_app_l {M N : Λ} : Free x M → Free x (M ∙ N)
+--   | free_app_r {M N : Λ} : Free x N → Free x (M ∙ N)
+--   | free_lam   {y : Atom} {M : Λ} : Free x M → y ≠ x → Free x (ƛ y M)
+--
+-- notation:50 a "#" M => Fresh a M
+-- notation:50 x "*" M => Free x M
+--
+-- theorem «lemma#λ» {a b : Atom} {M : Λ} (hba : a ≠ b) (h : a # ƛ b M) : a # M := by
+--   cases h with
+--   | fresh_lam_eq => contradiction
+--   | fresh_lam hM => exact hM
+--
+-- theorem «lemma∉→¬∈» {a : Atom} {M : Λ} (h1 : a ∉ₜ M) (h2 : a ∈ₜ M) : False := by
+--   induction h2 with
+--   | in_v => cases h1 with | not_in_v hba => exact hba rfl
+--   | in_app_r hN ih => cases h1 with | not_in_app hM' hN' => exact ih hN'
+--   | in_app_l hM ih => cases h1 with | not_in_app hM' hN' => exact ih hM'
+--   | in_lam_r hM ih => cases h1 with | not_in_lam hba hM' => exact ih hM'
+--   | in_lam_l => cases h1 with | not_in_lam hba hM' => exact hba rfl
+--
+-- theorem «lemma∉→#» {a : Atom} {M : Λ} (h : a ∉ₜ M) : a # M := by
+--   induction h with
+--   | not_in_v hba => exact Fresh.fresh_v hba
+--   | not_in_app _ _ ihM ihN => exact Fresh.fresh_app ihM ihN
+--   | not_in_lam hba _ ihM => exact Fresh.fresh_lam ihM
+--
+-- theorem «lemma-free→∈» {x : Atom} {M : Λ} (h : x * M) : x ∈ₜ M := by
+--   induction h with
+--   | free_v => exact InT.in_v
+--   | free_app_l _ ih => exact InT.in_app_l ih
+--   | free_app_r _ ih => exact InT.in_app_r ih
+--   | free_lam _ _ ih => exact InT.in_lam_r ih
+--
+-- def ocurr : Λ → List Atom
+--   | v a => [a]
+--   | M ∙ N => ocurr M ++ ocurr N
+--   | ƛ x M => x :: ocurr M
+--
+-- theorem lemmaocurr {a : Atom} {M : Λ} (h : a ∉ ocurr M) : a ∉ₜ M := by
+--   induction M with
+--   | v b =>
+--     simp [ocurr] at h
+--     apply NotInT.not_in_v
+--     intro h_eq; subst h_eq; exact h (by simp)
+--   | app M N ihM ihN =>
+--     simp [ocurr] at h
+--     have hM : a ∉ ocurr M := fun hM => h (List.mem_append_left _ hM)
+--     have hN : a ∉ ocurr N := fun hN => h (List.mem_append_right _ hN)
+--     exact NotInT.not_in_app (ihM hM) (ihN hN)
+--   | lam b M ih =>
+--     simp [ocurr] at h
+--     have hba : b ≠ a := fun h_eq => h (by left; exact h_eq.symm)
+--     have hM : a ∉ ocurr M := fun hM => h (by right; exact hM)
+--     exact NotInT.not_in_lam hba (ih hM)
+--
+-- def decFresh (x : Atom) (M : Λ) : Decidable (x # M) := by
+--   induction M with
+--   | v y =>
+--     if h : y = x then
+--       right; intro h_fresh; cases h_fresh with | fresh_v hne => exact hne h
+--     else
+--       left; exact Fresh.fresh_v h
+--   | app M N ihM ihN =>
+--     cases ihM with
+--     | isFalse hM => right; intro h_fresh; cases h_fresh with | fresh_app h1 h2 => exact hM h1
+--     | isTrue hM =>
+--       cases ihN with
+--       | isFalse hN => right; intro h_fresh; cases h_fresh with | fresh_app h1 h2 => exact hN h2
+--       | isTrue hN => left; exact Fresh.fresh_app hM hN
+--   | lam y M ihM =>
+--     if h : x = y then
+--       subst h; left; exact Fresh.fresh_lam_eq
+--     else
+--       cases ihM with
+--       | isTrue hM => left; exact Fresh.fresh_lam hM
+--       | isFalse hM =>
+--         right; intro h_fresh; cases h_fresh with
+--         | fresh_lam_eq => exact h rfl
+--         | fresh_lam hM => exact hM hM
+--
+-- instance (x : Atom) (M : Λ) : Decidable (x # M) := decFresh x M
+--
+-- theorem «lemma¬#→free» {x : Atom} {M : Λ} (h : ¬ (x # M)) : x * M := by
+--   induction M with
+--   | v y =>
+--     if hxy : y = x then
+--       subst hxy; exact Free.free_v
+--     else
+--       exfalso; exact h (Fresh.fresh_v hxy)
+--   | app M N ihM ihN =>
+--     by_cases hM : x # M
+--     ∙ by_cases hN : x # N
+--       ∙ exfalso; exact h (Fresh.fresh_app hM hN)
+--       ∙ exact Free.free_app_r (ihN hN)
+--     ∙ exact Free.free_app_l (ihM hM)
+--   | lam y M ihM =>
+--     if hxy : x = y then
+--       subst hxy; exfalso; exact h Fresh.fresh_lam_eq
+--     else
+--       by_cases hM : x # M
+--       ∙ exfalso; exact h (Fresh.fresh_lam hM)
+--       ∙ exact Free.free_lam (ihM hM) (Ne.symm hxy)
+--
+-- theorem «lemma-free→¬#» {x : Atom} {M : Λ} (hfree : x * M) (hfresh : x # M) : False := by
+--   induction hfree with
+--   | free_v => cases hfresh with | fresh_v hne => exact hne rfl
+--   | free_app_l _ ih => cases hfresh with | fresh_app h1 _ => exact ih h1
+--   | free_app_r _ ih => cases hfresh with | fresh_app _ h2 => exact ih h2
+--   | free_lam h1 hne ih => cases hfresh with
+--     | fresh_lam_eq => exact hne rfl
+--     | fresh_lam hM => exact ih hM
+--
+-- theorem «lemma-#→¬*» {x : Atom} {M : Λ} (hfresh : x # M) (hfree : x * M) : False :=
+--   «lemma-free→¬#» hfree hfresh
+--
+-- def swap_term (a b : Atom) : Λ → Λ
+--   | v c => v ((a ∙ b)ₐ c)
+--   | M ∙ N => swap_term a b M ∙ swap_term a b N
+--   | ƛ c M => ƛ ((a ∙ b)ₐ c) (swap_term a b M)
+--
+-- notation "(" a "∙" b ")" M => swap_term a b M
+--
+-- theorem «lemma∙cancel∉» {a b : Atom} {M : Λ} (ha : a ∉ₜ M) (hb : b ∉ₜ M) : (a ∙ b) M = M := by
+--   induction M with
+--   | v c =>
+--     cases ha with | not_in_v hca =>
+--     cases hb with | not_in_v hcb =>
+--     dsimp [swap_term]
+--     rw [Atom.lemma∙ₐc≢a∧c≢b hca hcb]
+--   | app M N ihM ihN =>
+--     cases ha with | not_in_app haM haN =>
+--     cases hb with | not_in_app hbM hbN =>
+--     dsimp [swap_term]
+--     rw [ihM haM hbM, ihN haN hbN]
+--   | lam c M ihM =>
+--     cases ha with | not_in_lam hca haM =>
+--     cases hb with | not_in_lam hcb hbM =>
+--     dsimp [swap_term]
+--     rw [Atom.lemma∙ₐc≢a∧c≢b hca hcb, ihM haM hbM]
+--
+-- theorem «lemma∙||» {M : Λ} {a b : Atom} : |(a ∙ b) M| = |M| := by
+--   induction M with
+--   | v _ => rfl
+--   | app M N ihM ihN => simp [swap_term, size, ihM, ihN]
+--   | lam _ M ih => simp [swap_term, size, ih]
+--
+-- theorem «lemma（aa）M≡M» {a : Atom} {M : Λ} : (a ∙ a) M = M := by
+--   induction M with
+--   | v b => simp [swap_term, Atom.lemma（aa）b≡b]
+--   | app M N ihM ihN => simp [swap_term, ihM, ihN]
+--   | lam b M ih => simp [swap_term, Atom.lemma（aa）b≡b, ih]
+--
+-- theorem «lemma（ab）（ab）M≡M» {a b : Atom} {M : Λ} : (a ∙ b) ((a ∙ b) M) = M := by
+--   induction M with
+--   | v c => simp [swap_term, Atom.lemma（ab）（ab）c≡c]
+--   | app M N ihM ihN => simp [swap_term, ihM, ihN]
+--   | lam c M ih => simp [swap_term, Atom.lemma（ab）（ab）c≡c, ih]
+--
+-- theorem «lemma∙comm» {a b : Atom} {M : Λ} : (a ∙ b) M = (b ∙ a) M := by
+--   induction M with
+--   | v c => simp [swap_term, Atom.lemma∙ₐcomm]
+--   | app M N ihM ihN => simp [swap_term, ihM, ihN]
+--   | lam c M ih => simp [swap_term, Atom.lemma∙ₐcomm, ih]
+--
+-- theorem «lemma∙distributive» {a b c d : Atom} {M : Λ} :
+--     (a ∙ b) ((c ∙ d) M) = ((a ∙ b)ₐ c ∙ (a ∙ b)ₐ d) ((a ∙ b) M) := by
+--   induction M with
+--   | v e => simp [swap_term, Atom.lemma∙ₐdistributive]
+--   | app M N ihM ihN => simp [swap_term, ihM, ihN]
+--   | lam e M ih => simp [swap_term, Atom.lemma∙ₐdistributive, ih]
+--
+-- theorem «lemma∙cancel» {a b c : Atom} {M : Λ} (hb : b ∉ₜ M) (hc : c ∉ₜ M) :
+--     (c ∙ b) ((a ∙ c) M) = (a ∙ b) M := by
+--   induction M with
+--   | v d =>
+--     cases hb with | not_in_v hdb =>
+--     cases hc with | not_in_v hdc =>
+--     simp [swap_term, Atom.lemma∙ₐcancel hdb hdc]
+--   | app M N ihM ihN =>
+--     cases hb with | not_in_app hbM hbN =>
+--     cases hc with | not_in_app hcM hcN =>
+--     simp [swap_term, ihM hbM hcM, ihN hbN hcN]
+--   | lam d M ihM =>
+--     cases hb with | not_in_lam hdb hbM =>
+--     cases hc with | not_in_lam hdc hcM =>
+--     simp [swap_term, Atom.lemma∙ₐcancel hdb hdc, ihM hbM hcM]
+--
+-- def fv : Λ → List Atom
+--   | v a => [a]
+--   | M ∙ N => fv M ++ fv N
+--   | ƛ a M => (fv M).filter (∙ ≠ a)
+--
+-- theorem «lemmafvfree→» (x : Atom) (M : Λ) (h : x ∈ fv M) : x * M := by
+--   induction M generalizing x with
+--   | v y =>
+--     simp [fv] at h
+--     subst h; exact Free.free_v
+--   | app M N ihM ihN =>
+--     simp [fv] at h
+--     cases h with
+--     | inl hM => exact Free.free_app_l (ihM x hM)
+--     | inr hN => exact Free.free_app_r (ihN x hN)
+--   | lam y M ih =>
+--     simp [fv] at h
+--     exact Free.free_lam (ih x h.1) h.2.symm
+--
+-- theorem «lemmafvfree←» (x : Atom) (M : Λ) (h : x * M) : x ∈ fv M := by
+--   induction h with
+--   | free_v => simp [fv]
+--   | free_app_l _ ih => simp [fv]; left; exact ih
+--   | free_app_r _ ih => simp [fv]; right; exact ih
+--   | free_lam _ hne ih => simp [fv]; exact ⟨ih, hne.symm⟩
+--
+-- theorem «lemmafv#» {x : Atom} {M : Λ} (h : x ∉ fv M) : x # M := by
+--   cases decFresh x M with
+--   | isTrue hfresh => exact hfresh
+--   | isFalse hnotfresh =>
+--     have hfree := «lemma¬#→free» hnotfresh
+--     have hmem := «lemmafvfree←» x M hfree
+--     contradiction
+--
+-- def χ (xs : List Atom) (M : Λ) : Atom :=
+--   χ' (xs ++ fv M)
+--
+-- theorem χ∉ (xs : List Atom) (M : Λ) : χ xs M ∉ xs := by
+--   have h := Chi.lemmaχ∉ (xs ++ fv M)
+--   intro hmem
+--   exact h (List.mem_append_left _ hmem)
+--
+-- theorem χ# (xs : List Atom) (M : Λ) : χ xs M # M := by
+--   have hnot_fv : χ xs M ∉ fv M := by
+--     have h := Chi.lemmaχ∉ (xs ++ fv M)
+--     intro hmem
+--     exact h (List.mem_append_right _ hmem)
+--   exact «lemmafv#» hnot_fv
+--
+-- theorem «lemma#swap» {M : Λ} {x y : Atom} (h : x # M) : y # (y ∙ x) M := by
+--   cases decFresh y ((y ∙ x) M) with
+--   | isTrue hfresh => exact hfresh
+--   | isFalse hnot =>
+--     exfalso
+--     have hfree := «lemma¬#→free» hnot
+--     induction M generalizing x y with
+--     | v c =>
+--       cases h with | fresh_v hne =>
+--       dsimp [swap_term] at hfree
+--       cases hfree with | free_v =>
+--       unfold swap_atom at hfree
+--       split_ifs at hfree <;> subst_vars <;> contradiction
+--     | app M N ihM ihN =>
+--       cases h with | fresh_app hM hN =>
+--       cases hfree with
+--       | free_app_l hM' => exact ihM hM hM'
+--       | free_app_r hN' => exact ihN hN hN'
+--     | lam c M ih =>
+--       cases h with
+--       | fresh_lam_eq =>
+--         dsimp [swap_term] at hfree
+--         cases hfree with | free_lam hM hne =>
+--         unfold swap_atom at hne
+--         split_ifs at hne <;> contradiction
+--       | fresh_lam hM =>
+--         dsimp [swap_term] at hfree
+--         cases hfree with | free_lam hM' hne =>
+--         exact ih hM hM'
+--
+-- theorem «lemma#swap≢» {M : Λ} {x y z : Atom} (hxy : x ≠ y) (hxz : x ≠ z) (h : x # M) : x # (y ∙ z) M := by
+--   cases decFresh x ((y ∙ z) M) with
+--   | isTrue hfresh => exact hfresh
+--   | isFalse hnot =>
+--     exfalso
+--     have hfree := «lemma¬#→free» hnot
+--     induction M generalizing x y z with
+--     | v c =>
+--       cases h with | fresh_v hne =>
+--       dsimp [swap_term] at hfree
+--       cases hfree
+--       unfold swap_atom at hfree
+--       split_ifs at hfree <;> subst_vars <;> contradiction
+--     | app M N ihM ihN =>
+--       cases h with | fresh_app hM hN =>
+--       cases hfree with
+--       | free_app_l hM' => exact ihM hxy hxz hM hM'
+--       | free_app_r hN' => exact ihN hxy hxz hN hN'
+--     | lam c M ih =>
+--       cases h with
+--       | fresh_lam_eq =>
+--         dsimp [swap_term] at hfree
+--         cases hfree with | free_lam hM' hne =>
+--         unfold swap_atom at hne
+--         split_ifs at hne <;> subst_vars <;> contradiction
+--       | fresh_lam hM =>
+--         dsimp [swap_term] at hfree
+--         cases hfree with | free_lam hM' hne =>
+--         exact ih hxy hxz hM hM'
+--
+-- inductive InB (a : Atom) : Λ → Prop where
+--   | in_b_app_l {M N : Λ} : InB a N → InB a (M ∙ N)
+--   | in_b_app_r {M N : Λ} : InB a M → InB a (M ∙ N)
+--   | in_b_lam_eq {M : Λ}   : InB a (ƛ a M)
+--   | in_b_lam    {b : Atom} {M : Λ} : InB a M → InB a (ƛ b M)
+--
+-- inductive NotInB (a : Atom) : Λ → Prop where
+--   | not_in_b_v   {b : Atom} : NotInB a (v b)
+--   | not_in_b_app {M N : Λ}  : NotInB a M → NotInB a N → NotInB a (M ∙ N)
+--   | not_in_b_lam {b : Atom} {M : Λ} : a ≠ b → NotInB a M → NotInB a (ƛ b M)
+--
+-- notation:50 a "∈b" M => InB a M
+-- notation:50 a "∉b" M => NotInB a M
+--
+-- def bv : Λ → List Atom
+--   | v _   => []
+--   | M ∙ N => bv M ++ bv N
+--   | ƛ a M => a :: bv M
+--
+-- inductive SubT : Λ → Λ → Prop where
+--   | sub_refl  {M : Λ} : SubT M M
+--   | sub_app_l {M N P : Λ} : SubT P M → SubT P (M ∙ N)
+--   | sub_app_r {M N P : Λ} : SubT P N → SubT P (M ∙ N)
+--   | sub_lam   {x : Atom} {M N : Λ} : SubT N M → SubT N (ƛ x M)
+--
+-- notation:50 P "⊆ₜ" M => SubT P M
+--
+-- end Term

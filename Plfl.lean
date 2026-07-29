@@ -16,3 +16,4 @@ public import Plfl.Untyped.Denotational.Compositional
 public import Plfl.Untyped.Denotational.Soundness
 public import Plfl.Untyped.Denotational.Adequacy
 public import Plfl.Untyped.Denotational.ContextualEquivalence
+public import Plfl.ReallyUntypedLambda.Ernius.Term

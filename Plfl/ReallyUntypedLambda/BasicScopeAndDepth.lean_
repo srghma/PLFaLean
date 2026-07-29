@@ -1,0 +1,44 @@
+import Mathlib.Data.Nat.Basic
+
+-- `Term n d` tracks BOTH:
+--   n : Scope Size (number of bound variables in scope)
+--   d : Tree Depth (height of the AST)
+inductive Term : Nat → Nat → Type
+  | var : ∀ {n : Nat}, Fin n → Term n 1
+  | abs : ∀ {n d : Nat}, Term (n + 1) d → Term n (d + 1)
+  | app : ∀ {n d1 d2 : Nat}, Term n d1 → Term n d2 → Term n (1 + max d1 d2)
+
+prefix:100 "λ " => Term.abs
+infixl:70 " ⬝ " => Term.app
+macro:100 "# " n:term:max : term => `(Term.var ⟨$n, by decide⟩)
+
+namespace Term
+
+-- Term scope depth
+-- id: scope 0, depth 2
+def id : Term 0 2 := λ (# 0)
+
+-- const: scope 0, depth 3
+def const : Term 0 3 := λ (λ (# 1))
+
+-- zero: scope 0, depth 3
+def zero : Term 0 3 := λ (λ (# 0))
+
+-- one: scope 0, depth 4
+def one : Term 0 4 := λ (λ (# 1 ⬝ # 0))
+
+-- two: scope 0, depth 5
+def two : Term 0 5 := λ (λ (# 1 ⬝ (# 1 ⬝ # 0)))
+
+-- succ: scope 0, depth 7
+def succ : Term 0 7 :=
+  λ (
+    λ (
+      λ (
+        # 1 ⬝
+        ((# 2 ⬝ # 1) ⬝ # 0)
+      )
+    )
+  )
+
+end Term
