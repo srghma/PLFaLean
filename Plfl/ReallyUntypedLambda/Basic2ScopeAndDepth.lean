@@ -55,6 +55,12 @@ def succ : Term 0 3 :=
     )
   )
 
+-- A term with 2 free variables, depth 0:
+def freeTerm : Term 2 0 := ## 0 ⬝ ## 1
+
+-- A term with 1 free variable, depth 1 (λy. y ⬝ x0):
+def boundAndFree : Term 1 1 := ƛ (# 0 ⬝ ## 1)
+
 end Term
 
 -- 1. WEAKENING / EXPANSION (n < m)

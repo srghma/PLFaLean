@@ -54,6 +54,12 @@ def succ : Term 0 :=
     )
   )
 
+-- A term with 2 free variables: (x0 x1)
+def freeTerm : Term 2 := ## 0 ⬝ ## 1
+
+-- A term with 1 free variable (x0): λy. (y x0)
+def boundAndFree : Term 1 := ƛ (# 0 ⬝ ## 1)
+
 end Term
 
 namespace Term
