@@ -571,27 +571,14 @@ theorem my_cast_heq {n : Nat} {s s' : Finset (Fin n)} {d d' : Nat} (t : Term n s
   subst hs; subst hd; rfl
 
 example : computeAndNormalizeUnbindAndUnion
-            (subst 0 Term.zero (by omega) (Term.var (0 : Fin 1))).2
-            (hs := (by decide)) -- Lean can compute this is ∅
-            (hd := (by grind [= substSet, = subst])) -- Lean can compute this is 2
-            = Term.zero := by
-  -- 1. Use the heterogeneous equality lemma you proved earlier
+    (subst 0 Term.zero (by omega) (Term.var (0 : Fin 1))).2
+    (hd := by grind [= substSet, = subst])
+    = Term.zero := by
   apply eq_of_heq
-
-  -- 2. Strip the 'computeAndNormalize...' wrapper using your helper
   refine HEq.trans (my_cast_heq _ _ _) ?_
-
-  -- 3. Now we need to prove HEq ((subst ...).2) Term.zero.
-  -- We do this by proving their 'beq' is true and using termBEq_heq.
   have h_beq : Term.beq (subst 0 Term.zero (by omega) (Term.var (0 : Fin 1))).2 Term.zero = true := by
-    -- We unfold the substitution call manually to get past the 'stuck' reduction
     rw [subst]
-    -- The Term.var case has an 'if h1 : i.val = j' branch.
-    -- Since i=0 and j=0, we can simplify this.
     simp only [Fin.val_zero]
-    -- Now the goal is simply 'Term.beq Term.zero Term.zero = true'
     apply termBEq_refl
 
-
-  -- 4. Extract the HEq from the boolean check
   exact (termBEq_heq _ _ h_beq).2.2
