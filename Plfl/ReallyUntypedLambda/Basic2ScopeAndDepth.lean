@@ -1,4 +1,5 @@
 import Mathlib.Data.Nat.Basic
+import Mathlib.Logic.Relation
 
 -- we want to force user to use `##` bc default `#synth OfNat (Fin 5) 10` will use mod. Disable these two (they do the same thing)
 attribute [-instance] Fin.instOfNat
@@ -65,13 +66,13 @@ end Term
 
 -- 1. WEAKENING / EXPANSION (n < m)
 -- Inserts new unused variables into scope.
-structure Weaken (n m : Nat) where
+structure RenameWeaken (n m : Nat) where
   lt  : n < m
   map : Fin n → Fin m
 
 -- 2. PERMUTATION (n = m)
 -- Reorders/swaps variables in scope. Must be a bijection (invertible).
-structure Perm (n : Nat) where
+structure RenamePerm (n : Nat) where
   map       : Fin n → Fin n
   inv       : Fin n → Fin n
   left_inv  : ∀ x, inv (map x) = x
@@ -79,17 +80,17 @@ structure Perm (n : Nat) where
 
 -- 3. CONTRACTION (n > m)
 -- Merges multiple variables into one.
-structure Contract (n m : Nat) where
+structure RenameContract (n m : Nat) where
   gt  : n > m
   map : Fin n → Fin m
 
 -- Extend Weakening under λ
-def Weaken.ext {n m : Nat} (w : Weaken n m) : Weaken (n + 1) (m + 1) where
+def RenameWeaken.ext {n m : Nat} (w : RenameWeaken n m) : RenameWeaken (n + 1) (m + 1) where
   lt  := Nat.succ_lt_succ w.lt
   map := Fin.cases 0 (fun i => (w.map i).succ)
 
 -- Extend Permutation under λ
-def Perm.ext {n : Nat} (p : Perm n) : Perm (n + 1) where
+def RenamePerm.ext {n : Nat} (p : RenamePerm n) : RenamePerm (n + 1) where
   map := Fin.cases 0 (fun i => (p.map i).succ)
   inv := Fin.cases 0 (fun i => (p.inv i).succ)
   left_inv := fun x => match x with
@@ -100,36 +101,95 @@ def Perm.ext {n : Nat} (p : Perm n) : Perm (n + 1) where
     | ⟨i + 1, h⟩ => by simp [p.right_inv ⟨i, Nat.lt_of_succ_lt_succ h⟩]
 
 -- Extend Contraction under λ
-def Contract.ext {n m : Nat} (c : Contract n m) : Contract (n + 1) (m + 1) where
+def RenameContract.ext {n m : Nat} (c : RenameContract n m) : RenameContract (n + 1) (m + 1) where
   gt  := Nat.succ_lt_succ c.gt
   map := Fin.cases 0 (fun i => (c.map i).succ)
 
 -- Apply Weakening (n < m) — Preserves abstraction depth d
-def renameWeaken {n m d : Nat} (w : Weaken n m) : Term n d → Term m d
+def renameWeaken {n m d : Nat} (w : RenameWeaken n m) : Term n d → Term m d
   | Term.var i => Term.var (w.map i)
   | ƛ M        => ƛ (renameWeaken w.ext M)
   | M ⬝ N      => (renameWeaken w M) ⬝ (renameWeaken w N)
 
 -- Apply Permutation (n = m) — Preserves abstraction depth d
-def renamePerm {n d : Nat} (p : Perm n) : Term n d → Term n d
+def renamePerm {n d : Nat} (p : RenamePerm n) : Term n d → Term n d
   | Term.var i => Term.var (p.map i)
   | ƛ M        => ƛ (renamePerm p.ext M)
   | M ⬝ N      => (renamePerm p M) ⬝ (renamePerm p N)
 
 -- Apply Contraction (n > m) — Preserves abstraction depth d
-def renameContract {n m d : Nat} (c : Contract n m) : Term n d → Term m d
+def renameContract {n m d : Nat} (c : RenameContract n m) : Term n d → Term m d
   | Term.var i => Term.var (c.map i)
   | ƛ M        => ƛ (renameContract c.ext M)
   | M ⬝ N      => (renameContract c M) ⬝ (renameContract c N)
 
-inductive Rename (n m : Nat) where
-  | weaken   : Weaken n m → Rename n m
-  | perm     : (h : n = m) → Perm n → Rename n m
-  | contract : Contract n m → Rename n m
+-- Helper Weakening constructor for shifting variables by +1 (Fin.succ)
+def RenameWeaken.succ (m : Nat) : RenameWeaken m (m + 1) where
+  lt  := Nat.lt_succ_self m
+  map := Fin.succ
 
--- Master rename function that delegates to the appropriate case
-def rename {n m d : Nat} (r : Rename n m) (t : Term n d) : Term m d :=
-  match r with
-  | .weaken w   => renameWeaken w t
-  | .perm h p   => h ▸ renamePerm p t
-  | .contract c => renameContract c t
+namespace Term
+
+-- Substitution maps (Fin n → Σ d, Term m d)
+def Subst (n m : Nat) : Type := Fin n → (d : Nat) × Term m d
+
+def exts {n m : Nat} (σ : Subst n m) : Subst (n + 1) (m + 1)
+  | ⟨0, _⟩     => ⟨0, # ⟨0, Nat.succ_pos _⟩⟩
+  | ⟨i + 1, h⟩ =>
+      let ⟨d, t⟩ := σ ⟨i, Nat.lt_of_succ_lt_succ h⟩
+      ⟨d, renameWeaken (RenameWeaken.succ m) t⟩
+
+def subst {n m : Nat} (σ : Subst n m) : ∀ {d : Nat}, Term n d → (d' : Nat) × Term m d'
+  | _, Term.var i => σ i
+  | _, ƛ M        => let ⟨d', M'⟩ := subst (exts σ) M; ⟨d' + 1, ƛ M'⟩
+  | _, M ⬝ N      => let ⟨dM', M'⟩ := subst σ M; let ⟨dN', N'⟩ := subst σ N; ⟨max dM' dN', M' ⬝ N'⟩
+
+-- Substitution of top variable (Fin (n+1) → Σ d, Term n d)
+def substZero {n dN : Nat} (N : Term n dN) : Subst (n + 1) n
+  | ⟨0, _⟩     => ⟨dN, N⟩
+  | ⟨i + 1, h⟩ => ⟨0, # ⟨i, Nat.lt_of_succ_lt_succ h⟩⟩
+
+-- Clean single-substitution operator
+def betaSubst {n dM dN : Nat} (M : Term (n + 1) dM) (N : Term n dN) : (d' : Nat) × Term n d' :=
+  subst (substZero N) M
+
+end Term
+
+notation:70 M " [" N "]" => (Term.betaSubst M N)
+
+-- Standard Single-Step Beta Reduction (Beta)
+inductive Beta : ∀ {n d1 d2 : Nat}, Term n d1 → Term n d2 → Prop where
+  | basis {n dM dN : Nat} (M : Term (n + 1) dM) (N : Term n dN) :
+      Beta ((ƛ M) ⬝ N) (M[N].2)
+  | appr {n d1 d2 d3 : Nat} {M : Term n d1} {N : Term n d2} (L : Term n d3) :
+      Beta M N → Beta (M ⬝ L) (N ⬝ L)
+  | appl {n d1 d2 d3 : Nat} {M : Term n d1} {N : Term n d2} (L : Term n d3) :
+      Beta M N → Beta (L ⬝ M) (L ⬝ N)
+  | abs {n d1 d2 : Nat} {M : Term (n + 1) d1} {N : Term (n + 1) d2} :
+      Beta M N → Beta (ƛ M) (ƛ N)
+
+infixl:65 " →β " => Beta
+
+-- Many-step Beta reduction
+notation:65 N₁ " ⇒β " N₂ => Relation.ReflTransGen Beta N₁ N₂
+
+-- Parallel Beta Reduction (BetaP)
+inductive BetaP : ∀ {n d1 d2 : Nat}, Term n d1 → Term n d2 → Prop where
+  | var {n : Nat} (i : Fin n) :
+      BetaP (# i) (# i)
+  | abs {n d1 d2 : Nat} {M : Term (n + 1) d1} {N : Term (n + 1) d2} :
+      BetaP M N → BetaP (ƛ M) (ƛ N)
+  | app {n dM dM' dN dN' : Nat} {M : Term n dM} {M' : Term n dM'} {N : Term n dN} {N' : Term n dN'} :
+      BetaP M M' → BetaP N N' → BetaP (M ⬝ N) (M' ⬝ N')
+  | subst {n dM dM' dN dN' : Nat} {M : Term (n + 1) dM} {M' : Term (n + 1) dM'} {N : Term n dN} {N' : Term n dN'} :
+      BetaP M M' → BetaP N N' → BetaP ((ƛ M) ⬝ N) (M'[N'].2)
+
+infixl:65 " →βp " => BetaP
+
+-- Reflexivity of Parallel Reduction
+@[refl]
+theorem betap_refl {n d : Nat} (N : Term n d) : N →βp N := by
+  induction N with
+  | var i => exact BetaP.var i
+  | abs M ih => exact BetaP.abs ih
+  | app M N ihM ihN => exact BetaP.app ihM ihN

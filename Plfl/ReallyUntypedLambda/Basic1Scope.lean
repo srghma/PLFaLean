@@ -62,40 +62,84 @@ def boundAndFree : Term 1 := ƛ (# 0 ⬝ ## 1)
 
 end Term
 
+-- WEAKENING / EXPANSION (n < m)
+-- Inserts new unused variables into scope.
+structure RenameWeaken (n m : Nat) where
+  lt  : n < m
+  map : Fin n → Fin m
+
+-- Extend Weakening under λ
+def RenameWeaken.ext {n m : Nat} (w : RenameWeaken n m) : RenameWeaken (n + 1) (m + 1) where
+  lt  := Nat.succ_lt_succ w.lt
+  map := Fin.cases 0 (fun i => (w.map i).succ)
+
+-- Apply Weakening (n < m)
+def renameWeaken {n m : Nat} (w : RenameWeaken n m) : Term n → Term m
+  | Term.var i => Term.var (w.map i)
+  | ƛ M        => ƛ (renameWeaken w.ext M)
+  | M ⬝ N      => (renameWeaken w M) ⬝ (renameWeaken w N)
+
+-- Helper Weakening constructor for shifting variables by +1 (Fin.succ)
+def RenameWeaken.succ (m : Nat) : RenameWeaken m (m + 1) where
+  lt  := Nat.lt_succ_self m
+  map := Fin.succ
+
+-- 1. WEAKENING SUBSTITUTION (n < m)
+structure SubstWeaken (n m : Nat) where
+  lt  : n < m
+  map : Fin n → Term m
+
+-- Extend Weakening Substitution under λ
+def SubstWeaken.ext {n m : Nat} (σ : SubstWeaken n m) : SubstWeaken (n + 1) (m + 1) where
+  lt  := Nat.succ_lt_succ σ.lt
+  map := Fin.cases (# 0) (fun i => renameWeaken (RenameWeaken.succ m) (σ.map i))
+
+-- Apply Weakening Substitution (n < m)
+def substWeaken {n m : Nat} (σ : SubstWeaken n m) : Term n → Term m
+  | # i   => σ.map i
+  | ƛ M   => ƛ (substWeaken σ.ext M)
+  | M ⬝ N => (substWeaken σ M) ⬝ (substWeaken σ N)
+
+-- 2. SAME-SCOPE SUBSTITUTION (n = m)
+structure SubstSame (n : Nat) where
+  map : Fin n → Term n
+
+-- Extend Same-Scope Substitution under λ
+def SubstSame.ext {n : Nat} (σ : SubstSame n) : SubstSame (n + 1) where
+  map := Fin.cases (# 0) (fun i => renameWeaken (RenameWeaken.succ n) (σ.map i))
+
+-- Apply Same-Scope Substitution (n = m)
+def substSame {n : Nat} (σ : SubstSame n) : Term n → Term n
+  | # i   => σ.map i
+  | ƛ M   => ƛ (substSame σ.ext M)
+  | M ⬝ N => (substSame σ M) ⬝ (substSame σ N)
+
+-- 3. CONTRACTING SUBSTITUTION (n > m)
+structure SubstContract (n m : Nat) where
+  gt  : n > m
+  map : Fin n → Term m
+
+-- Extend Contracting Substitution under λ
+def SubstContract.ext {n m : Nat} (σ : SubstContract n m) : SubstContract (n + 1) (m + 1) where
+  gt  := Nat.succ_lt_succ σ.gt
+  map := Fin.cases (# 0) (fun i => renameWeaken (RenameWeaken.succ m) (σ.map i))
+
+-- Apply Contracting Substitution (n > m)
+def substContract {n m : Nat} (σ : SubstContract n m) : Term n → Term m
+  | # i   => σ.map i
+  | ƛ M   => ƛ (substContract σ.ext M)
+  | M ⬝ N => (substContract σ M) ⬝ (substContract σ N)
+
 namespace Term
 
--- Renaming functions (index maps Fin n → Fin m)
-def Rename (n m : Nat) : Type := Fin n → Fin m
-
-def ext {n m : Nat} (ρ : Rename n m) : Rename (n + 1) (m + 1)
-  | ⟨0, _⟩     => ⟨0, Nat.succ_pos _⟩
-  | ⟨i + 1, h⟩ => (ρ ⟨i, Nat.lt_of_succ_lt_succ h⟩).succ
-
-def rename {n m : Nat} (ρ : Rename n m) : Term n → Term m
-  | # i     => # (ρ i)
-  | ƛ M     => ƛ (rename (ext ρ) M)
-  | M ⬝ N   => (rename ρ M) ⬝ (rename ρ N)
-
--- Substitution maps (Fin n → Term m)
-def Subst (n m : Nat) : Type := Fin n → Term m
-
-def exts {n m : Nat} (σ : Subst n m) : Subst (n + 1) (m + 1)
-  | ⟨0, _⟩     => # ⟨0, Nat.succ_pos _⟩
-  | ⟨i + 1, h⟩ => rename Fin.succ (σ ⟨i, Nat.lt_of_succ_lt_succ h⟩)
-
-def subst {n m : Nat} (σ : Subst n m) : Term n → Term m
-  | # i   => σ i
-  | ƛ M   => ƛ (subst (exts σ) M)
-  | M ⬝ N => (subst σ M) ⬝ (subst σ N)
-
 -- Substitution of top variable (Fin (n+1) → Term n)
-def substZero {n : Nat} (N : Term n) : Subst (n + 1) n
-  | ⟨0, _⟩     => N
-  | ⟨i + 1, h⟩ => # ⟨i, Nat.lt_of_succ_lt_succ h⟩
+def mkSubstZero {n : Nat} (N : Term n) : SubstContract (n + 1) n where
+  gt  := Nat.lt_succ_self n
+  map := Fin.cases N (fun i => # i)
 
 -- Clean single-substitution operator
 def betaSubst {n : Nat} (M : Term (n + 1)) (N : Term n) : Term n :=
-  subst (substZero N) M
+  substContract (mkSubstZero N) M
 
 end Term
 

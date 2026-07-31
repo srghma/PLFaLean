@@ -399,6 +399,10 @@ abbrev shiftMask (c : Nat) {n : Nat} (s : BitVec n) (h : c ≤ n) : BitVec (n + 
 abbrev substMask (j : Nat) {n : Nat} (sN : BitVec n) (sP : BitVec (n + 1)) (h : j ≤ n) : BitVec n :=
   removeBitAt j sP h ||| (if sP.getLsb ⟨j, by omega⟩ then sN else 0#n)
 
+#guard (substMask 0 0b100#3 0b001#4 (by decide) = 0b100#3) -- [λ] λ λ | #2
+#guard (substMask 1 0b100#3 0b001#4 (by decide) = 0b1#3) -- [λ] λ λ | #2
+#guard (substMask 2 0b100#3 0b001#4 (by decide) = 0b1#3) -- [λ] λ λ | #2
+
 theorem popScope_eq_removeBitAt {n : Nat} (s : BitVec (n + 1)) :
     popScope s = removeBitAt 0 s (by omega) := by
   simp_all only [BitVec.truncate_eq_setWidth]
@@ -756,43 +760,42 @@ decreasing_by (all_goals (simp [Term.size]; try omega))
 
 -- 1. Simple substitution: x_0[0 := N] ⟹ N
 #guard
-  let N : Term (0b100#3) (0#0) := ##[3] 2
-  let P : Term (0b0001#4) (0#0) := ##[4] 0
-  Term.beq (Term.subst 0 N (by omega) P).2.2 N
+  let N : Term (0b100#3) (0#0) := ##[3] 2 -- [λ] λ λ | #2
+  let P : Term (0b0001#4) (0#0) := ##[4] 0 -- λ λ λ [λ] | #0
+  Term.beq (Term.subst 0 N (by omega) P).2.2 N -- [λ] λ λ | #2 (NOT λ [λ] λ λ | #2)
 
 -- 2. Inner variable remains unchanged: x_0[1 := N] ⟹ x_0
 #guard
-  let N : Term (0b100#3) (0#0) := ##[3] 2
-  let P : Term (0b0001#4) (0#0) := ##[4] 0
-  Term.beq (Term.subst 1 N (by omega) P).2.2 (##[3] 0)
+  let N : Term (0b100#3) (0#0) := ##[3] 2  -- [λ] λ λ | #2
+  let P : Term (0b0001#4) (0#0) := ##[4] 0 -- λ λ [λ] λ | #0 (subst at j=1: 2nd λ from right)
+  Term.beq (Term.subst 1 N (by omega) P).2.2 (##[3] 0) -- λ λ [λ] | #0 (j=0 < 1: untouched, scope contracts 4->3)
 
 -- 3. Free variable decrement: x_2[0 := N] ⟹ x_1
 #guard
-  let N : Term (0b100#3) (0#0) := ##[3] 2
-  let P : Term (0b0100#4) (0#0) := ##[4] 2
-  Term.beq (Term.subst 0 N (by omega) P).2.2 (##[3] 1)
+  let N : Term (0b100#3) (0#0) := ##[3] 2  -- [λ] λ λ | #2
+  let P : Term (0b0100#4) (0#0) := ##[4] 2 -- λ [λ] λ λ | #2 (subst at j=0: 1st λ from right)
+  Term.beq (Term.subst 0 N (by omega) P).2.2 (##[3] 1) -- λ [λ] λ | #1 (j=2 > 0: index decrements 2->1)
 
 -- 4. Substitution under λ-abstraction: (λ. x_1)[0 := N] ⟹ λ. N_shifted
 #guard
-  let N : Term (0b100#3) (0#0) := ##[3] 2
-  let P : Term (0b0001#4) (0b0#1) := ⟦ ƛ (##[5] 1) ⟧
-  let expected : Term (0b0100#3) (0b0#1) := ⟦ ƛ (##[4] 3) ⟧
+  let N : Term (0b100#3) (0#0) := ##[3] 2  -- [λ] λ λ | #2
+  let P : Term (0b0001#4) (0b0#1) := ⟦ ƛ (##[5] 1) ⟧ -- λ λ λ [λ] | ƛ #1 (inside ƛ: λ λ λ [λ] λ_b | #1)
+  let expected : Term (0b0100#3) (0b0#1) := ⟦ ƛ (##[4] 3) ⟧ -- λ [λ] λ | ƛ #3 (inside ƛ: [λ] λ λ λ_b | #3)
   Term.beq (Term.subst 0 N (by omega) P).2.2 expected
 
 -- 5. Shadowing inside λ: (λ. x_0)[0 := N] ⟹ λ. x_0
 #guard
-  let N : Term (0b100#3) (0#0) := ##[3] 2
-  let P : Term (0b0000#4) (0b1#1) := ⟦ ƛ (##[5] 0) ⟧
-  let expected : Term (0b0000#3) (0b1#1) := ⟦ ƛ (##[4] 0) ⟧
+  let N : Term (0b100#3) (0#0) := ##[3] 2  -- [λ] λ λ | #2
+  let P : Term (0b0000#4) (0b1#1) := ⟦ ƛ (##[5] 0) ⟧ -- λ λ λ λ | ƛ [λ_b] #0 (inside ƛ: #0 points to bound λ_b)
+  let expected : Term (0b0000#3) (0b1#1) := ⟦ ƛ (##[4] 0) ⟧ -- λ λ λ | ƛ [λ_b] #0 (shadowed, untouched)
   Term.beq (Term.subst 0 N (by omega) P).2.2 expected
 
 -- 6. Real β-step substitution: (x_0 x_1)[0 := var 2] ⟹ var 2 var 0
 #guard
-  let N : Term (0b100#3) (0#0) := ##[3] 2
-  let body : Term (0b0011#4) (0#0) := ⟦ ##[4] 0 ⬝ ##[4] 1 ⟧
-  let expected : Term (0b101#3) (0#0) := ⟦ ##[3] 2 ⬝ ##[3] 0 ⟧
+  let N : Term (0b100#3) (0#0) := ##[3] 2  -- [λ] λ λ | #2
+  let body : Term (0b0011#4) (0#0) := ⟦ ##[4] 0 ⬝ ##[4] 1 ⟧ -- λ λ [λ] [λ] | #0 #1
+  let expected : Term (0b101#3) (0#0) := ⟦ ##[3] 2 ⬝ ##[3] 0 ⟧ -- [λ] λ [λ] | #2 #0
   Term.beq (Term.subst 0 N (by omega) body).2.2 expected
-
 
 def Term.betaSubst {n : Nat} {sP : BitVec (n + 1)} {dP : Nat} {uP : BitVec dP}
     (M : Term sP uP) {sN : BitVec n} {dN : Nat} {uN : BitVec dN} (N : Term sN uN) :
