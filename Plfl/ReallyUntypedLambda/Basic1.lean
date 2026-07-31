@@ -45,35 +45,31 @@ inductive BetaStep : Term → Term → Prop where
       BetaStep P P' →
       BetaStep (Term.abs P) (Term.abs P')
 
--- Визначаємо простий do-блок для unit-тестів
-def testSubst : Id Unit := do
-  -- 1. Проста заміна: x_0[0 := N] ⟹ N
-  -- Підставляємо Term.var 42 замість індексу 0 у простому термі (var 0)
-  guard (subst 0 (Term.var 42) (Term.var 0) == Term.var 42)
+-- 1. Проста заміна: x_0[0 := N] ⟹ N
+-- Підставляємо Term.var 42 замість індексу 0 у простому термі (var 0)
+#guard (subst 0 (Term.var 42) (Term.var 0) == Term.var 42)
 
-  -- 2. Внутрішня змінна залишається без змін: x_0[1 := N] ⟹ x_0
-  -- Оскільки шукаємо індекс 1, а маємо 0 (який < 1)
-  guard (subst 1 (Term.var 42) (Term.var 0) == Term.var 0)
+-- 2. Внутрішня змінна залишається без змін: x_0[1 := N] ⟹ x_0
+-- Оскільки шукаємо індекс 1, а маємо 0 (який < 1)
+#guard (subst 1 (Term.var 42) (Term.var 0) == Term.var 0)
 
-  -- 3. Декремент вільних змінних: x_2[0 := N] ⟹ x_1
-  -- Змінна з індексом 2 при видаленні одного зовн. binder-а стає 1
-  guard (subst 0 (Term.var 42) (Term.var 2) == Term.var 1)
+-- 3. Декремент вільних змінних: x_2[0 := N] ⟹ x_1
+-- Змінна з індексом 2 при видаленні одного зовн. binder-а стає 1
+#guard (subst 0 (Term.var 42) (Term.var 2) == Term.var 1)
 
-  -- 4. Підстановка під λ-абстракцію: (λ. x_1)[0 := N] ⟹ λ. N_shifted
-  -- Всередині λ індекс підстановки зростає до 1 (j+1), а x_1 відповідає 0 ззовні
-  -- subst 0 (var 42) (abs (var 1)) = abs (shift 1 0 (var 42)) = abs (var 43)
-  guard (subst 0 (Term.var 42) (Term.abs (Term.var 1)) == Term.abs (Term.var 43))
+-- 4. Підстановка під λ-абстракцію: (λ. x_1)[0 := N] ⟹ λ. N_shifted
+-- Всередині λ індекс підстановки зростає до 1 (j+1), а x_1 відповідає 0 ззовні
+-- subst 0 (var 42) (abs (var 1)) = abs (shift 1 0 (var 42)) = abs (var 43)
+#guard (subst 0 (Term.var 42) (Term.abs (Term.var 1)) == Term.abs (Term.var 43))
 
-  -- 5. Затінення всередині λ: (λ. x_0)[0 := N] ⟹ λ. x_0
-  -- Змінна 0 всередині λ зв'язана саме цим λ, тому вона не змінюється
-  guard (subst 0 (Term.var 42) (Term.abs (Term.var 0)) == Term.abs (Term.var 0))
+-- 5. Затінення всередині λ: (λ. x_0)[0 := N] ⟹ λ. x_0
+-- Змінна 0 всередині λ зв'язана саме цим λ, тому вона не змінюється
+#guard (subst 0 (Term.var 42) (Term.abs (Term.var 0)) == Term.abs (Term.var 0))
 
-  -- 6. Реальний β-step для β-редукції: ((λ. x_0 x_1) (var 99))
-  -- Реалізуємо (x_0 x_1)[0 := var 99] ⟹ var 99 var 0
+-- 6. Реальний β-step для β-редукції: ((λ. x_0 x_1) (var 99))
+-- Реалізуємо (x_0 x_1)[0 := var 99] ⟹ var 99 var 0
+#guard
   let body := Term.app (Term.var 0) (Term.var 1)
   let arg  := Term.var 99
   let expected := Term.app (Term.var 99) (Term.var 0)
-  guard (subst 0 arg body == expected)
-
--- Запускаємо тести під час компіляції / перевірки файлу
-#eval testSubst
+  subst 0 arg body == expected
