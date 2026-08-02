@@ -762,19 +762,25 @@ decreasing_by (all_goals (simp [Term.size]; try omega))
 #guard
   let N : Term (0b100#3) (0#0) := ##[3] 2 -- [λ] λ λ | #2
   let P : Term (0b0001#4) (0#0) := ##[4] 0 -- λ λ λ [λ] | #0
-  Term.beq (Term.subst 0 N (by omega) P).2.2 N -- [λ] λ λ | #2 (NOT λ [λ] λ λ | #2)
+  -- it substituted #0 with #2 -> gave λ [λ] λ λ | #2
+  -- and then peeled off 1 top lambda and scope contracted 4->3 -> [λ] λ λ | #2
+  Term.beq (Term.subst 0 N (by omega) P).2.2 N
 
 -- 2. Inner variable remains unchanged: x_0[1 := N] ⟹ x_0
 #guard
   let N : Term (0b100#3) (0#0) := ##[3] 2  -- [λ] λ λ | #2
-  let P : Term (0b0001#4) (0#0) := ##[4] 0 -- λ λ [λ] λ | #0 (subst at targetIndex=1: 2nd λ from right)
-  Term.beq (Term.subst 1 N (by omega) P).2.2 (##[3] 0) -- λ λ [λ] | #0 (targetIndex=0 < 1: untouched, scope contracts 4->3)
+  let P : Term (0b0001#4) (0#0) := ##[4] 0 -- λ λ λ [λ] | #0
+  -- it didn't substitute #1 with #2 bc there is no #1 in P -> so it remained λ λ λ [λ] | #0
+  -- then it peeled off 1 top lambda and scope contracted 4->3 -> [λ] λ λ | #0
+  Term.beq (Term.subst 1 N (by omega) P).2.2 (##[3] 0)
 
 -- 3. Free variable decrement: x_2[0 := N] ⟹ x_1
 #guard
   let N : Term (0b100#3) (0#0) := ##[3] 2  -- [λ] λ λ | #2
-  let P : Term (0b0100#4) (0#0) := ##[4] 2 -- λ [λ] λ λ | #2 (subst at targetIndex=0: 1st λ from right)
-  Term.beq (Term.subst 0 N (by omega) P).2.2 (##[3] 1) -- λ [λ] λ | #1 (targetIndex=2 > 0: index decrements 2->1)
+  let P : Term (0b0100#4) (0#0) := ##[4] 2 -- λ [λ] λ λ | #2
+  -- it didn't substitute #0 with #2 bc there is no #0 in P -> so it remained λ [λ] λ λ | #2
+  -- then it peeled off 1 top lambda and scope contracted 4->3 -> [λ] λ λ | #2
+  Term.beq (Term.subst 0 N (by omega) P).2.2 (##[3] 1)
 
 -- 4. Substitution under λ-abstraction: (λ. x_1)[0 := N] ⟹ λ. N_shifted
 #guard
@@ -820,3 +826,53 @@ inductive BetaStep : ∀ {n1 : Nat} {s1 : BitVec n1} {d1 : Nat} {u1 : BitVec d1}
   | abs_body {P P' : _} : (P →β P') → (ƛ P) →β (ƛ P')
 
 notation:65 N₁ " ⇒β " N₂ => Relation.ReflTransGen BetaStep N₁ N₂
+
+-- BetaStep.head test 1: (ƛ #0) · #0  →β  #0 [= #0 itself]
+--   M is in scope 1 (n+1 = 1 means n = 0), N must be in scope 0.
+--   ##[1] 0 : Term (0b1#1) — #0 in scope 1 (just one free variable slot).
+--   N : Term (0#0) — the empty-scope term (no free variables).
+--   Result: substituting #0 with N in (#0), gives N directly.
+example : ((ƛ (##[1] 0)) ⬝ (Term.abs (##[1] 0))) →β ((##[1] 0) [ Term.abs (##[1] 0) ]) :=
+  BetaStep.head _ _
+
+-- -- BetaStep.head test 2: (ƛ (ƛ #0)) · anything  →β  ƛ #0
+-- --   Body M: ƛ #0 (identity in scope 1, depth 1). Lives in scope n+1 = 1 → n = 0.
+-- --   N must live in scope 0 (no free variables).
+-- --   The omega function applied to itself: (ƛ ƛ #0) · (ƛ #0)
+-- example :
+--     let M : Term (0b0#1) (0b1#1) := ⟦ ƛ (##[1] 0) ⟧  -- | ƛ [λ_b] #0
+--     let N : Term (0b0#0) (0b1#1) := ⟦ ƛ (##[1] 0) ⟧  -- | ƛ [λ_b] #0 (in scope 0)
+--     (ƛ M ⬝ N) →β M [ N ] := BetaStep.head _ _
+
+-- -- BetaStep.head test 3: (ƛ #0) · (ƛ #0)  →β  (ƛ #0)
+-- --   Identity applied to identity = identity.
+-- --   Scope of M: n+1 = 1 → n = 0. N must be in scope 0.
+-- example :
+--     ((ƛ (##[1] 0)) ⬝ (⟦ ƛ (##[1] 0) ⟧ : Term (0b0#0) _))
+--     →β ((##[1] 0) [ (⟦ ƛ (##[1] 0) ⟧ : Term (0b0#0) _) ]) :=
+--   BetaStep.head _ _
+
+-- BetaStep.app_left: ((ƛ #0) · (ƛ #0)) · (ƛ #0)  →β  ((#0 [ ƛ #0 ]) · (ƛ #0))
+--   β fires in the left branch of application.
+example :
+    (((ƛ (##[1] 0)) ⬝ (Term.abs (##[1] 0))) ⬝ (Term.abs (##[1] 0)))
+    →β (((##[1] 0) [ Term.abs (##[1] 0) ]) ⬝ (Term.abs (##[1] 0))) :=
+  BetaStep.app_left _ (BetaStep.head _ _)
+
+-- BetaStep.app_right: P · ((ƛ Q) · N) →β P · (Q [N])
+--   β fires in the right branch. Use Term.abs for the function P.
+--   P = Term.abs (Term.abs (##[1] 0)) : closed term (scope 0#0)
+--   Right branch = (ƛ #0) · (ƛ #0): scope 0#0 ✓ matches P.
+example : BetaStep
+    (Term.abs (Term.abs (##[1] 0)) ⬝ ((Term.abs (##[1] 0)) ⬝ (Term.abs (##[1] 0))))
+    _ :=
+  BetaStep.app_right _ (BetaStep.head _ _)
+
+-- BetaStep.abs_body: ƛ ((ƛ P) · N) →β ƛ (P [N])
+--   β fires inside the body of an abstraction.
+--   Body = (ƛ #0) · (ƛ #0): scope 0#0, depth 1.
+--   The body lives in scope n+1=1 (inside the outer ƛ), so n=0: N must be in scope 0.
+example : BetaStep
+    (Term.abs ((Term.abs (##[1] 0)) ⬝ (Term.abs (##[1] 0))))
+    _ :=
+  BetaStep.abs_body (BetaStep.head _ _)

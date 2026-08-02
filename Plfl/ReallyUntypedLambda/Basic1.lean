@@ -1,5 +1,3 @@
--- https://github.com/iwilare/church-rosser/blob/main/DeBruijn.agda
-
 -- https://github.com/ernius/formalmetatheory-nominal-Church-Rosser/blob/master/Atom.lagda
 -- https://github.com/ernius/formalmetatheory-nominal-Church-Rosser/blob/master/Term.lagda
 
