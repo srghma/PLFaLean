@@ -1,5 +1,8 @@
 module
+
+public import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Diamond
 public import Mathlib.Logic.Relation
+
 @[expose] public section
 
 namespace DanelnovButBetaIsNotProp
@@ -69,7 +72,7 @@ def range : Lambda → Nat
 
 end Lambda
 
-inductive Beta : Lambda → Lambda → Prop
+inductive Beta : Lambda → Lambda → Type
   | basis (M N : Lambda) : Beta ((λ M).app N) (Lambda.beta M N)
   | appr (M N L : Lambda) : Beta N M → Beta (N.app L) (M.app L)
   | appl (M N L : Lambda): Beta N M → Beta (L.app N) (L.app M)
@@ -77,7 +80,7 @@ inductive Beta : Lambda → Lambda → Prop
 
 infixl:65 " →β " => Beta
 
-inductive BetaP : Lambda → Lambda → Prop
+inductive BetaP : Lambda → Lambda → Type
   | var (n : Nat) : BetaP n n
   | abs (N M) : BetaP N M → BetaP (λ N) (λ M)
   | app (M M' N N') : BetaP M M' → BetaP N N' → BetaP (M.app N) (M'.app N')
@@ -86,12 +89,12 @@ inductive BetaP : Lambda → Lambda → Prop
 infixl:65 " →βp " => BetaP
 
 @[refl]
-theorem betap_refl {N : Lambda} :  N →βp N := by
-  induction N with
-  | var n => constructor
-  | app N₁ N₂ ih₁ ih₂ => constructor <;> assumption
-  | abs M ih => constructor; assumption
+def betap_refl {N : Lambda} : N →βp N :=
+  match N with
+  | Lambda.var n => BetaP.var n
+  | Lambda.app _N₁ _N₂ => BetaP.app _ _ _ _ betap_refl betap_refl
+  | Lambda.abs _M => BetaP.abs _ _ betap_refl
 
-notation:65 N₁ " ⇒β " N₂ => Relation.ReflTransGen Beta N₁ N₂
+notation:65 N₁ " ⇒β " N₂ => ReflTransGen Beta N₁ N₂
 
 end DanelnovButBetaIsNotProp

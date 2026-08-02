@@ -1,10 +1,10 @@
 module
 public import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Defs
 public import Mathlib.Tactic.Ring
-open Lambda
 @[expose] public section
 
 namespace DanelnovButBetaIsNotProp
+open Lambda
 
 lemma unshift_var_le {c i n : Nat} :
   c ≤ n → (↓) c i (var n) = var (n - i) := by
