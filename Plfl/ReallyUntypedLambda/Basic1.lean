@@ -2,7 +2,7 @@
 -- https://github.com/ernius/formalmetatheory-nominal-Church-Rosser/blob/master/Term.lagda
 
 -- https://github.com/Danelnov/Lambda-Calculus-Formalization/blob/master/Lambda/Defs.lean
-
+module
 inductive Term where
   | var : Nat → Term
   | app : Term → Term → Term

@@ -1,3 +1,4 @@
+module
 inductive Ty | base | arrow : Ty → Ty → Ty
 
 infixr:70 " ⇒ " => Ty.arrow

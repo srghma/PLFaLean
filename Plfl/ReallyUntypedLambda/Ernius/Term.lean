@@ -1,3 +1,4 @@
+module
 import Mathlib.Data.List.Basic
 import Mathlib.Data.Nat.Basic
 import Plfl.ReallyUntypedLambda.Ernius.Atom

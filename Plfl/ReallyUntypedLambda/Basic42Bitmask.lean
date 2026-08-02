@@ -1,3 +1,4 @@
+module
 import Mathlib.Data.Nat.Basic
 
 attribute [-instance] Fin.instOfNat

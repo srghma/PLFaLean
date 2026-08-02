@@ -1,3 +1,4 @@
+module
 import Aesop
 
 abbrev Atom := Nat

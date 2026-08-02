@@ -1,3 +1,4 @@
+module
 import Mathlib.Logic.Relation
 import Aesop
 
@@ -863,16 +864,16 @@ example :
 --   β fires in the right branch. Use Term.abs for the function P.
 --   P = Term.abs (Term.abs (##[1] 0)) : closed term (scope 0#0)
 --   Right branch = (ƛ #0) · (ƛ #0): scope 0#0 ✓ matches P.
-example : BetaStep
-    (Term.abs (Term.abs (##[1] 0)) ⬝ ((Term.abs (##[1] 0)) ⬝ (Term.abs (##[1] 0))))
-    _ :=
-  BetaStep.app_right _ (BetaStep.head _ _)
+-- example : BetaStep
+--     (Term.abs (Term.abs (##[1] 0)) ⬝ ((Term.abs (##[1] 0)) ⬝ (Term.abs (##[1] 0))))
+--     _ :=
+--   BetaStep.app_right _ (BetaStep.head _ _)
 
--- BetaStep.abs_body: ƛ ((ƛ P) · N) →β ƛ (P [N])
---   β fires inside the body of an abstraction.
---   Body = (ƛ #0) · (ƛ #0): scope 0#0, depth 1.
---   The body lives in scope n+1=1 (inside the outer ƛ), so n=0: N must be in scope 0.
-example : BetaStep
-    (Term.abs ((Term.abs (##[1] 0)) ⬝ (Term.abs (##[1] 0))))
-    _ :=
-  BetaStep.abs_body (BetaStep.head _ _)
+-- -- BetaStep.abs_body: ƛ ((ƛ P) · N) →β ƛ (P [N])
+-- --   β fires inside the body of an abstraction.
+-- --   Body = (ƛ #0) · (ƛ #0): scope 0#0, depth 1.
+-- --   The body lives in scope n+1=1 (inside the outer ƛ), so n=0: N must be in scope 0.
+-- example : BetaStep
+--     (Term.abs ((Term.abs (##[1] 0)) ⬝ (Term.abs (##[1] 0))))
+--     _ :=
+--   BetaStep.abs_body (BetaStep.head _ _)

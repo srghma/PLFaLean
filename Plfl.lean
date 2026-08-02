@@ -17,3 +17,11 @@ public import Plfl.Untyped.Denotational.Soundness
 public import Plfl.Untyped.Denotational.Adequacy
 public import Plfl.Untyped.Denotational.ContextualEquivalence
 public import Plfl.ReallyUntypedLambda.Ernius.Term
+public import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Defs
+public import Plfl.ReallyUntypedLambda.Iwilare
+public import Plfl.ReallyUntypedLambda.Basic1
+public import Plfl.ReallyUntypedLambda.Basic2ScopeAndDepth
+public import Plfl.ReallyUntypedLambda.Basic3Typed
+public import Plfl.ReallyUntypedLambda.Basic41Finset
+public import Plfl.ReallyUntypedLambda.Basic42Bitmask
+public import Plfl.ReallyUntypedLambda.Basic43BitVec

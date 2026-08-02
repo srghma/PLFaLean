@@ -1,4 +1,5 @@
 -- https://github.com/iwilare/church-rosser/blob/main/DeBruijn.agda
+module
 
 import Aesop
 import Mathlib.Logic.Relation

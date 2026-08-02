@@ -1,0 +1,280 @@
+module
+import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Defs
+import Mathlib.Tactic.Ring
+open Lambda
+
+lemma unshift_var_le {c i n : Nat} :
+  c ≤ n → (↓) c i (var n) = var (n - i) := by
+  intro h
+  unfold unshift
+  have nnltc : ¬ (n < c) := by omega
+  simp [nnltc]
+
+lemma unshift_var_lt {c i n : Nat} : n < c → (↓) c i n = var n := by
+  intro h; unfold unshift; simp [h]
+
+@[simp]
+lemma shift_zero {N : Lambda} : ∀ {c}, (↑) c 0 N = N := by
+  induction N with
+  | var n => intro; simp
+  | app N₁ N₂ ih₁ ih₂ => intro; simp [ih₁, ih₂]
+  | abs M ih => intro; simp [ih]
+
+lemma shift_add' (N : Lambda) :
+  ∀ {c i₁ i₂ : Nat}, (↑) c i₁ ((↑) c i₂ N) = (↑) c (i₁ + i₂) N := by
+  induction N with
+  | var n => intro; repeat (first | omega | simp | split_ifs)
+  | app N₁ N₂ ih₁ ih₂ => intro; simp [ih₁, ih₂]
+  | abs M ih => intro; simp [ih]
+
+@[simp]
+lemma shift_add (n m : Nat) (N : Lambda)
+  : ∀ (i j : Nat), i ≤ j → j ≤ i + m → (↑) j n ((↑) i m N) = (↑) i (m + n) N := by
+  induction N with
+  | var k => intros; repeat (first | omega | simp | split_ifs)
+  | app e v ihe ihv =>
+    intros; simp; constructor <;> (first | apply ihe | apply ihv) <;> omega
+  | abs e ih => intros; simp; apply ih <;> omega
+
+@[simp]
+lemma subst_gt_range {M : Lambda} : ∀ {N n}, n > range M → M[n := N] = M := by
+  induction M with
+  | var m =>
+    intro _ _ h; unfold range at h
+    simp; intro; omega
+  | app M₁ M₂ ih1 ih2 =>
+    intro _ _ h
+    unfold range at h
+    have ⟨ngt1, ngt2⟩ := Nat.max_lt.mp h
+    simp [ih1 ngt1, ih2 ngt2]
+  | abs M ih => intro _ _ h; simp [subst, ih (Nat.lt_add_right 1 h)]
+
+lemma gt_range_gt_shift {N : Lambda} :
+  ∀ {n i j}, n > range N → n + j > range ((↑) i j N) := by
+  induction N with
+  | var m => intros; simp_all; split_ifs <;> simp <;> omega
+  | app N₁ N₂ ih1 ih2 => intros; simp_all
+  | abs N ih => intro _ _ _ h; simp [ih h]
+
+@[simp]
+lemma shift_unshift_id (M : Lambda) (c i : Nat) : (↓) (c + i) i ((↑) c i M) = M := by
+  induction M generalizing c with
+  | var n => repeat (first | simp | split_ifs | omega)
+  | app M₁ M₂ ih1 ih2 => simp [ih1, ih2]
+  | abs M ih =>
+    simp; rw [Nat.add_assoc, Nat.add_comm i 1, ← Nat.add_assoc]; exact ih (c + 1)
+
+inductive Shifted : Nat → Nat → Lambda → Prop
+  | svar1 {d c n} : n < c → Shifted d c n
+  | svar2 {d c n} : c + d ≤ n → d ≤ n → Shifted d c n
+  | sapp {d c N₁ N₂} : Shifted d c N₁ → Shifted d c N₂ → Shifted d c (N₁.app N₂)
+  | sabs {d c N} : Shifted d (c + 1) N → Shifted d c (λ N)
+
+open Shifted
+
+lemma shift_shifted (d c) (N : Lambda) : Shifted d c ((↑) c d N) := by
+  induction N generalizing c <;> simp
+  case var n =>
+    split_ifs
+    . apply svar1; assumption
+    . apply svar2 <;> omega
+  all_goals constructor <;> aesop
+
+lemma shift_shifted' {d c d' c'} {N : Lambda} :
+  c' ≤ c + d → Shifted d c N → Shifted d (d' + c) ((↑) c' d' N) := by
+  intro h₁ h₂
+  induction h₂ generalizing c' with
+  | svar1 =>
+    repeat (first | simp_all | split_ifs | omega)
+    all_goals (apply svar1; omega)
+  | svar2 =>
+    repeat (first | simp_all | split_ifs | omega)
+    apply svar2 <;> omega
+  | sapp => apply sapp <;> aesop
+  | sabs _ ih =>
+    apply sabs
+    rw [Nat.add_assoc]
+    apply ih; omega
+
+lemma shift_unshift_swap {d c d' c'} {N : Lambda} :
+  c' ≤ c → Shifted d' c' N → (↑) c d ((↓) c' d' N) = (↓) c' d' ((↑) (c + d') d N) := by
+  intro h₁ h₂
+  match N, h₂ with
+  | _, sapp _ _ =>
+    simp; constructor <;> apply shift_unshift_swap h₁ <;> assumption
+  | _, sabs _ =>
+    simp
+    rw [Nat.add_assoc, Nat.add_comm d' 1, ← Nat.add_assoc]
+    apply shift_unshift_swap; omega; assumption
+  | var n, svar1 _ =>
+    have : n < c := by omega
+    have : n < c + d' := by omega
+    simp_all
+  | var n, svar2 _ _ => repeat (first | split_ifs | omega | simp_all)
+
+lemma weak_shifted {d c} (n) {N : Lambda} : Shifted (d + n) c N → Shifted d (c + n) N := by
+  intro h
+  match n, h with
+  | 0, h => assumption
+  | _, svar1 _ => constructor; omega
+  | _, svar2 _ _ => apply svar2 <;> omega
+  | _, sapp _ _ => apply sapp <;> apply weak_shifted _ <;> assumption
+  | n + 1, sabs hN =>
+    apply sabs
+    rw [Nat.add_right_comm c (n + 1) 1]
+    apply weak_shifted _; assumption
+
+@[aesop safe]
+lemma shifted_subst' (n : Nat) (N₁ N₂ : Lambda) :Shifted 1 n (N₁ [n := (↑) 0 (n + 1) N₂]) := by
+  induction N₁ generalizing n <;> simp
+  case var m =>
+    split_ifs
+    . nth_rw 1 [← Nat.zero_add n]
+      nth_rw 2 [Nat.add_comm]
+      apply weak_shifted _; apply shift_shifted
+    . by_cases h : m < n
+      . apply svar1; assumption
+      . apply svar2 <;> omega
+  case app _ _ ih1 ih2 => apply sapp <;> (first | apply ih1 | apply ih2)
+  case abs N ih =>  apply sabs; apply ih
+
+lemma shift_shift_swap {d c d' c'} (N : Lambda) :
+  c ≤ c' → (↑) c d ((↑) c' d' N) = (↑) (c' + d) d' ((↑) c d N) := by
+  intros h
+  induction N generalizing c c' with
+  | var => repeat (first | simp | split_ifs | omega)
+  | app => simp_all
+  | abs =>
+    simp_all; nth_rw 2 [Nat.add_assoc]; rw [Nat.add_comm d 1, ← Nat.add_assoc]
+
+lemma unshift_shift_swap {d c d' c'}  {N : Lambda} :
+  c' ≤ c → Shifted d c N → (↑) c' d' ((↓) c d N) = (↓) (c + d') d ((↑) c' d' N) := by
+  intro cplec h
+  induction N generalizing c' c with
+  | var => cases h <;> repeat (first | simp | split_ifs | omega)
+  | app => cases h; simp; constructor <;> aesop
+  | abs => cases h; simp; rw [Nat.add_right_comm]; aesop
+
+@[simp]
+lemma shift_subst_swap {d c n} (h : n < c) (N₁ N₂ : Lambda) :
+  (↑) c d (N₁ [n := N₂]) = ((↑) c d N₁)[n := (↑) c d N₂] := by
+  induction N₁ generalizing N₂ c n with
+  | var => repeat (first | simp | split_ifs | omega)
+  | app => simp_all
+  | abs =>
+    simp_all
+    have : (↑) 0 1 ((↑) c d N₂) = (↑) (c + 1) d ((↑) 0 1 N₂) := by
+      apply shift_shift_swap; omega
+    rw [this]
+
+@[simp]
+lemma unshift_shift_setoff {d c d' c'} (N : Lambda) :
+  c ≤ c' → c' ≤ d' + d + c → (↓) c' d' ((↑) c (d' + d) N) = (↑) c d N := by
+  intros h₁ h₂
+  induction N generalizing c c' with
+  | var => repeat (first | simp | split_ifs | omega)
+  | app => simp_all
+  | abs _ ih => simp_all; apply ih <;> omega
+
+lemma unshift_subst_swap {c n} (N₁ N₂ : Lambda) : c ≤ n → Shifted 1 c N₁ →
+  (↓) c 1 (N₁ [n + 1 := (↑) 0 (c + 1) N₂]) = ((↓) c 1 N₁)[n := (↑) 0 c N₂] := by
+  intros h₁ h₂
+  induction N₁ generalizing n c with
+  | var m =>
+    cases h₂ <;> repeat (first | simp_all | split_ifs | omega)
+    any_goals (exfalso; omega)
+    . rw [Nat.add_comm c 1]; simp_all
+    . have : ¬ m < c := by omega
+      have : n ≠ m - 1 := by omega
+      simp_all
+  | _ => cases h₂; simp_all
+
+@[simp]
+lemma unshift_subst_swap' {n} (N₁ N₂ : Lambda) :
+  Shifted 1 0 N₁ → (↓) 0 1 (N₁[n + 1 := (↑) 0 1 N₂]) = ((↓) 0 1 N₁)[n := N₂] := by
+  intros
+  nth_rw 2 [← @shift_zero N₂ 0]
+  nth_rw 3 [← Nat.zero_add 1]
+  apply unshift_subst_swap; omega; assumption
+
+lemma unshift_subst_swap2 {d c n} {N₁ N₂ : Lambda} :
+  n < c → Shifted d c N₁ → Shifted d c N₂ →
+  (↓) c d (N₁[n := N₂]) = ((↓) c d N₁)[n := (↓) c d N₂] := by
+  intros nlec h₁ h₂
+  induction N₁ generalizing c n N₂ with
+  | var => cases h₁ <;> repeat (first | simp_all | split_ifs | omega)
+  | app => cases h₁; simp; constructor <;> aesop
+  | abs N ih =>
+    cases h₁; simp
+    rw [unshift_shift_swap (by omega) (by assumption)]
+    apply ih <;> try aesop
+    rw [Nat.add_comm]
+    apply @shift_shifted' <;> aesop
+
+lemma shift_subst_swap' {d c n} (N₁ N₂ : Lambda) (h : c ≤ n) :
+  (↑) c d (N₁[n := N₂]) = ((↑) c d N₁)[n + d := (↑) c d N₂] := by
+  induction N₁ generalizing c n N₂ with
+  | var => repeat (first | simp | split_ifs | omega)
+  | app => simp_all
+  | abs =>
+    simp_all
+    rw [Nat.add_assoc n d 1, Nat.add_comm d 1, ← Nat.add_assoc]
+    nth_rw 2 [shift_shift_swap]
+    omega
+
+@[simp]
+lemma subst_shited_cancel {d c n} (N₁ N₂ : Lambda) :
+  c ≤ n → n < c + d → Shifted d c N₁ → N₁[n := N₂] = N₁ := by
+  intro h₁ h₂ h₃
+  induction h₃ generalizing n N₂ with
+  | svar1 | svar2 => simp_all; intros; omega
+  | sapp => simp_all
+  | sabs _ ih => simp_all; apply ih <;> omega
+
+lemma substitution' {n m} (N₁ N₂ N₃ : Lambda) :
+  N₁[m := (↑) 0 (m + 1) N₂][m + 1 + n := (↑) 0 (m + 1) N₃] =
+  N₁[m + 1 + n := (↑) 0 (m + 1) N₃][m := ((↑) 0 (m + 1) N₂)[m + 1 + n := (↑) 0 (m + 1) N₃]] := by
+  induction N₁ generalizing m n N₂ N₃ with
+  | var =>
+    repeat (first | simp | split_ifs | omega)
+    . rw [@subst_shited_cancel (m + 1) 0]; any_goals omega
+      . apply shift_shifted
+    . repeat (first | simp | split_ifs | omega)
+  | app => simp_all
+  | abs _ ih =>
+    simp_all
+    have : m + 1 + n + 1 = m + 1 + 1 + n := by omega
+    rw [shift_subst_swap', shift_add, shift_add, this]; any_goals omega
+    apply ih
+
+lemma unshift_unshift_swap {d c d' c'} {N : Lambda} :
+  c' ≤ c → Shifted d' c' N → Shifted d c ((↓) c' d' N) →
+  (↓) c d ((↓) c' d' N) = (↓) c' d' ((↓) (c + d') d N) := by
+  intro h₁ h₂ h₃
+  induction N generalizing c c' with
+  | var =>
+    repeat (first | simp_all | split_ifs | omega)
+    all_goals (cases h₂ <;> cases h₃ <;> (try omega))
+    simp; omega
+  | app => cases h₂; cases h₃; simp_all
+  | abs =>
+    cases h₂; cases h₃; simp_all
+    rw [Nat.add_right_comm c d' 1]
+
+lemma shifted_subst {d c n} {N₁ N₂ : Lambda} :
+  Shifted d (n + 1 + c) N₁ → Shifted d c N₂ →
+  Shifted d (n + c) ((↓) n 1 (N₁[n := (↑) 0 (n + 1) N₂])) := by
+  intro h₁ h₂
+  induction N₁ generalizing n with
+  | var m =>
+    cases h₁ <;> repeat (first | simp_all | split_ifs | omega)
+    . rw [Nat.add_comm m 1, unshift_shift_setoff _ (by omega) (by omega)]
+      apply shift_shifted'; omega
+      aesop
+    . simp; split_ifs <;> (apply svar1; omega)
+    . apply svar2 <;> omega
+  | app => cases h₁; simp; apply sapp <;> aesop
+  | abs _ ih =>
+    cases h₁; simp; apply sabs
+    rw [Nat.add_right_comm] at *
+    aesop
