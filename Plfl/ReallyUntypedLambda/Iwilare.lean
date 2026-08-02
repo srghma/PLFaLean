@@ -560,15 +560,92 @@ theorem beta_confluence {n : Nat} {M N1 N2 : Term n}
   rcases h_join with ⟨D, hN1_D, hN2_D⟩
   exact ⟨D, betapar_star_eq_betastar.mp hN1_D, betapar_star_eq_betastar.mp hN2_D⟩
 
-/-- The Strip Lemma for Single-Step Beta Reduction:
-    If x reduces in 1 step to y and z, they can join within * steps. -/
-theorem beta_strip {n : Nat} (x y z : Term n) (h1 : x —→ y) (h2 : x —→ z) :
-    ∃ d, (y —→* d) ∧ (z —→* d) :=
-  ⟨takahashi x, betapar_to_betastar (takahashi_triangle (beta_to_betapar h1)),
-                betapar_to_betastar (takahashi_triangle (beta_to_betapar h2))⟩
+/-- The Strip Lemma for Parallel Reduction:
+    Matches Mathlib's Relation.church_rosser hypothesis structure. -/
+theorem beta_strip {n : Nat} (a b c : Term n) (hab : a ⇉ b) (hac : a ⇉ c) :
+    ∃ d, Relation.ReflGen BetaPar b d ∧ Relation.ReflTransGen BetaPar c d := by
+  rcases betapar_diamond hab hac with ⟨d, hbd, hcd⟩
+  exact ⟨d, Relation.ReflGen.single hbd, Relation.ReflTransGen.single hcd⟩
+
+theorem betapar_church_rosser {n : Nat} {a b c : Term n}
+    (hab : a ⇉* b) (hac : a ⇉* c) : Relation.Join (Relation.ReflTransGen BetaPar) b c :=
+  Relation.church_rosser beta_strip hab hac
 
 -- Church-Rosser for multi-step beta reduction on Terms
 theorem beta_church_rosser {n : Nat} {a b c : Term n}
-    (hab : a —→* b) (hac : a —→* c) : BetaJoin b c :=
-  beta_confluence hab hac
-  -- Relation.church_rosser beta_strip hab hac
+    (hab : a —→* b) (hac : a —→* c) : BetaJoin b c := by
+  have hab_par : a ⇉* b := betapar_star_eq_betastar.mpr hab
+  have hac_par : a ⇉* c := betapar_star_eq_betastar.mpr hac
+  rcases betapar_church_rosser hab_par hac_par with ⟨d, hbd, hcd⟩
+  exact ⟨d, betapar_star_eq_betastar.mp hbd, betapar_star_eq_betastar.mp hcd⟩
+
+namespace WhyTakahashiDetourNeeded
+-- Falsity of Single-Step ReflGen Strip Lemma:
+-- Single-step Beta reduction (—→) does NOT satisfy ReflGen strip lemma
+-- because contracting a redex can duplicate another redex, requiring 2+ steps to join.
+
+def I1 : Term 1 := ƛ (v#0)
+def term_a1 : Term 1 := (ƛ (v#0 ⬝ v#0)) ⬝ (I1 ⬝ v#0)
+def term_b1 : Term 1 := (I1 ⬝ v#0) ⬝ (I1 ⬝ v#0)
+def term_c1 : Term 1 := (ƛ (v#0 ⬝ v#0)) ⬝ v#0
+def term_d1 : Term 1 := v#0 ⬝ v#0
+
+theorem hab1 : term_a1 —→ term_b1 := Beta.basis (v#0 ⬝ v#0) (I1 ⬝ v#0)
+theorem hac1 : term_a1 —→ term_c1 := Beta.appl (ƛ (v#0 ⬝ v#0)) (Beta.basis (v#0) (v#0))
+
+theorem term_c1_step (x : Term 1) (h : term_c1 —→ x) : x = term_d1 := by
+  cases h with
+  | basis => rfl
+  | appl _ h_sub => cases h_sub
+  | appr _ h_sub =>
+    cases h_sub with
+    | abs h_inner =>
+      cases h_inner with
+      | appl _ h0 => cases h0
+      | appr _ h0 => cases h0
+
+theorem var_normal {n : Nat} (i : Fin n) (x : Term n) : ¬ (v#i —→ x) := by
+  intro h; cases h
+
+theorem term_d1_normal (x : Term 1) : ¬ (term_d1 —→ x) := by
+  intro h
+  cases h with
+  | appl _ h_sub => exact var_normal 0 _ h_sub
+  | appr _ h_sub => exact var_normal 0 _ h_sub
+
+theorem term_c1_steps (x : Term 1) (h : term_c1 —→* x) :
+    x = term_c1 ∨ x = term_d1 := by
+  induction h with
+  | refl => left; rfl
+  | tail _ step ih =>
+    rcases ih with rfl | rfl
+    · right; exact term_c1_step _ step
+    · exact (term_d1_normal _ step).elim
+
+theorem term_b1_not_reflGen_c1 : ¬ (term_b1 —→≤1 term_c1) := by
+  intro h
+  cases h with
+  | single h_step => cases h_step
+
+theorem term_b1_not_reflGen_d1 : ¬ (term_b1 —→≤1 term_d1) := by
+  intro h
+  cases h with
+  | single h_step => cases h_step
+
+/-- Formal Proof of Falsity:
+    Single-step Beta reduction cannot satisfy relation strip lemma with ReflGen. -/
+-- THIS leads to false, this is why cannot write
+-- ```lean
+-- theorem beta_church_rosser {n : Nat} {a b c : Term n}
+--     (hab : a —→* b) (hac : a —→* c) : BetaJoin b c :=
+--   Relation.church_rosser beta_strip_refl hab hac
+-- ```
+-- This is why have to use Takahashi's detour
+theorem not_beta_strip_refl : ¬ (∀ {n : Nat} (a b c : Term n), a —→ b → a —→ c → ∃ d, b —→≤1 d ∧ c —→* d) := by
+  intro h
+  rcases h term_a1 term_b1 term_c1 hab1 hac1 with ⟨d, hbd, hcd⟩
+  rcases term_c1_steps d hcd with rfl | rfl
+  · exact term_b1_not_reflGen_c1 hbd
+  · exact term_b1_not_reflGen_d1 hbd
+
+end WhyTakahashiDetourNeeded
