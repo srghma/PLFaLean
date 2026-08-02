@@ -3,6 +3,9 @@
 
 -- https://github.com/Danelnov/Lambda-Calculus-Formalization/blob/master/Lambda/Defs.lean
 module
+@[expose] public section
+
+namespace Basic1
 inductive Term where
   | var : Nat → Term
   | app : Term → Term → Term
@@ -71,3 +74,5 @@ inductive BetaStep : Term → Term → Prop where
   let arg  := Term.var 99
   let expected := Term.app (Term.var 99) (Term.var 0)
   subst 0 arg body == expected
+
+end Basic1

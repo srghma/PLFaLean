@@ -1,5 +1,8 @@
 module
-import Mathlib.Logic.Relation
+public import Mathlib.Logic.Relation
+@[expose] public section
+
+namespace DanelnovButBetaIsNotProp
 
 inductive Lambda
   | var : Nat → Lambda
@@ -90,3 +93,5 @@ theorem betap_refl {N : Lambda} :  N →βp N := by
   | abs M ih => constructor; assumption
 
 notation:65 N₁ " ⇒β " N₂ => Relation.ReflTransGen Beta N₁ N₂
+
+end DanelnovButBetaIsNotProp

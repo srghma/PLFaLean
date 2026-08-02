@@ -1,10 +1,13 @@
 module
 
-import Mathlib.Logic.Relation
-import Mathlib.Tactic
+public import Mathlib.Logic.Relation
+public import Mathlib.Tactic
 
 open Relation
 open ReflTransGen
+@[expose] public section
+
+namespace DanelnovButBetaIsNotProp
 
 def Diamond (R : α → α → Prop) := ∀ {A B C}, R A B → R A C → ∃ D, R B D ∧ R C D
 
@@ -40,3 +43,5 @@ theorem equiv_confluence
     Diamond R' := by unfold Diamond; simp [← reqv]; exact diamond
 
 end Confluence
+
+end DanelnovButBetaIsNotProp

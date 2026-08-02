@@ -1,7 +1,10 @@
 module
-import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Defs
-import Mathlib.Tactic.Ring
+public import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Defs
+public import Mathlib.Tactic.Ring
 open Lambda
+@[expose] public section
+
+namespace DanelnovButBetaIsNotProp
 
 lemma unshift_var_le {c i n : Nat} :
   c ≤ n → (↓) c i (var n) = var (n - i) := by
@@ -278,3 +281,5 @@ lemma shifted_subst {d c n} {N₁ N₂ : Lambda} :
     cases h₁; simp; apply sabs
     rw [Nat.add_right_comm] at *
     aesop
+
+end DanelnovButBetaIsNotProp

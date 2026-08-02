@@ -1,5 +1,6 @@
 module
-import Mathlib.Data.List.Basic
+public import Mathlib.Data.List.Basic
+@[expose] public section
 
 abbrev V := Nat
 

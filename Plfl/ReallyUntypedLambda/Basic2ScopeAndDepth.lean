@@ -1,6 +1,10 @@
 module
-import Mathlib.Data.Nat.Basic
-import Mathlib.Logic.Relation
+public import Mathlib.Data.Nat.Basic
+public import Mathlib.Logic.Relation
+
+@[expose] public section
+
+namespace Basic2ScopeAndDepth
 
 -- we want to force user to use `##` bc default `#synth OfNat (Fin 5) 10` will use mod. Disable these two (they do the same thing)
 attribute [-instance] Fin.instOfNat
@@ -263,3 +267,5 @@ theorem betap_refl {n d : Nat} (N : Term n d) : N →βp N := by
   | var i => exact BetaP.var i
   | abs M ih => exact BetaP.abs ih
   | app M N ihM ihN => exact BetaP.app ihM ihN
+
+end Basic2ScopeAndDepth

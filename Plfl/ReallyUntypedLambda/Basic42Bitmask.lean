@@ -1,5 +1,10 @@
 module
-import Mathlib.Data.Nat.Basic
+public import Mathlib.Data.Nat.Basic
+public import Mathlib.Logic.Relation
+
+@[expose] public section
+
+namespace Basic42Bitmask
 
 attribute [-instance] Fin.instOfNat
 attribute [-instance] Lean.Grind.Semiring.ofNat
@@ -74,3 +79,5 @@ def freeTerm : Term 2 (b{0, 1}) 0 := ⟦##[2] 0 ⬝ ##[2] 1⟧
 def boundAndFree : Term 1 (b{0}) 1 := ⟦ƛ (# 0 ⬝ ##[2] 1)⟧
 
 end Term
+
+end Basic42Bitmask

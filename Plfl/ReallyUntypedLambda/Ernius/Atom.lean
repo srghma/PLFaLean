@@ -1,6 +1,6 @@
 module
-import Aesop
-
+public import Aesop
+@[expose] public section
 abbrev Atom := Nat
 
 def swap_atom (a b c : Atom) : Atom :=

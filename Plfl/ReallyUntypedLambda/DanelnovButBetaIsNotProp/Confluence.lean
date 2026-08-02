@@ -1,9 +1,11 @@
 module
-import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Defs
-import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Properties
-import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Diamond
-import Mathlib.Tactic
+public import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Defs
+public import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Properties
+public import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Diamond
+public import Mathlib.Tactic
+@[expose] public section
 
+namespace DanelnovButBetaIsNotProp
 open Lambda
 
 @[simp]
@@ -257,3 +259,5 @@ theorem church_rosser : Diamond <| Relation.ReflTransGen Beta := by
     apply paratr_iff_betatr
     apply confluence
     exact para_diamond
+
+end DanelnovButBetaIsNotProp

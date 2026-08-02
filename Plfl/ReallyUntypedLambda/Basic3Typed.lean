@@ -1,4 +1,7 @@
 module
+@[expose] public section
+
+namespace Basic3Typed
 inductive Ty | base | arrow : Ty → Ty → Ty
 
 infixr:70 " ⇒ " => Ty.arrow
@@ -80,3 +83,5 @@ def boundAndFree {α β : Ty} : Term [α] ((α ⇒ β) ⇒ β) :=
   ƛ (#0 ⬝ #1)
 
 end Term
+
+end Basic3Typed

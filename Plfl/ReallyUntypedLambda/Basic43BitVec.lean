@@ -1,6 +1,10 @@
 module
-import Mathlib.Logic.Relation
-import Aesop
+public import Mathlib.Logic.Relation
+public import Aesop
+
+@[expose] public section
+
+namespace Basic43BitVec
 
 attribute [-instance] Fin.instOfNat
 attribute [-instance] Lean.Grind.Semiring.ofNat
@@ -751,8 +755,8 @@ def Term.subst (targetIndex : Nat) {n : Nat} {newPartBitVec : BitVec n} {dN : Na
       ⟨max dP' dQ', mergeUsage uP' uQ',
         castTerm (Term.app P' Q') (substMask_mergeScope targetIndex newPartBitVec s1 s2 hj).symm rfl⟩
   | _, _, _, @Term.abs _ _ s_abs u_abs P =>
-      let N' := Term.shift 0 (by omega) N
-      let ⟨dP', uP', P'⟩ := Term.subst (targetIndex + 1) N' (by omega) P
+      let N' := Term.shift (n := n) 0 (Nat.zero_le n) N
+      let ⟨dP', uP', P'⟩ := Term.subst (targetIndex + 1) N' (Nat.succ_le_succ hj) P
       ⟨dP' + 1, recordBinderUsage (s_abs.getLsb 0) uP',
         castTerm (Term.abs P') (popScope_substMask targetIndex newPartBitVec s_abs hj)
           (by rw [getLsb_zero_substMask targetIndex newPartBitVec s_abs hj])⟩
@@ -877,3 +881,5 @@ example :
 --     (Term.abs ((Term.abs (##[1] 0)) ⬝ (Term.abs (##[1] 0))))
 --     _ :=
 --   BetaStep.abs_body (BetaStep.head _ _)
+
+end Basic43BitVec

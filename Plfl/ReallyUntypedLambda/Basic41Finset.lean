@@ -1,12 +1,22 @@
 module
-import Aesop
-import Mathlib.Data.Nat.Basic
-import Mathlib.Data.Finset.Basic
-import Mathlib.Data.Finset.Filter
-import Mathlib.Data.Finset.Erase
-import Mathlib.Data.Finset.Attach
-import Mathlib.Data.Finset.Image
-import Mathlib.Data.Finset.Union
+public import Aesop
+public import Mathlib.Data.Nat.Basic
+public import Mathlib.Data.Finset.Basic
+public import Mathlib.Data.Finset.Filter
+public import Mathlib.Data.Finset.Erase
+public import Mathlib.Data.Finset.Attach
+public import Mathlib.Data.Finset.Image
+public import Mathlib.Data.Finset.Union
+public import Mathlib.Data.Finset.Insert
+public import Mathlib.Data.Finset.Empty
+public import Mathlib.Data.Finset.Lattice.Basic
+public import Mathlib.Logic.Relation
+public meta import Mathlib.Data.Finset.Insert
+public meta import Mathlib.Data.Finset.Lattice.Basic
+
+@[expose] public section
+
+namespace Basic41Finset
 
 -- import Mathlib.Data.Finset.Lattice  -- for biUnion, if you need it elsewhere
 
@@ -286,7 +296,6 @@ theorem mem_unbind {n : Nat} {s : Finset (Fin (n + 1))} {x : Fin n} :
     refine ⟨⟨⟨x.val + 1, by omega⟩, fun h0 => by have := congr_arg Fin.val h0; simp_all only [Fin.mk_eq_zero, Nat.add_eq_zero_iff, one_ne_zero, and_false]⟩, h, ?_⟩
     ext
     simp [predEmbedding]
-    rfl
 
 theorem mem_shiftSet {n : Nat} {c : Nat} {s : Finset (Fin n)} {y : Fin (n + 1)} :
     y ∈ shiftSet c s ↔ ∃ i ∈ s, (if i.val ≥ c then i.val + 1 else i.val) = y.val := by
@@ -583,3 +592,5 @@ example : computeAndNormalizeUnbindAndUnion
     apply termBEq_refl
 
   exact (termBEq_heq _ _ h_beq).2.2
+
+end Basic41Finset

@@ -1,8 +1,12 @@
 -- https://github.com/iwilare/church-rosser/blob/main/DeBruijn.agda
 module
 
-import Aesop
-import Mathlib.Logic.Relation
+public import Aesop
+public import Mathlib.Logic.Relation
+
+@[expose] public section
+
+namespace Iwilare
 
 -- we want to force user to use `v##` bc default `v#synth OfNat (Fin 5) 10` will use mod. Disable these two (they do the same thing)
 attribute [-instance] Fin.instOfNat
@@ -650,3 +654,5 @@ theorem not_beta_strip_refl : ¬ (∀ {n : Nat} (a b c : Term n), a —→ b →
   · exact term_b1_not_reflGen_d1 hbd
 
 end WhyTakahashiDetourNeeded
+
+end Iwilare

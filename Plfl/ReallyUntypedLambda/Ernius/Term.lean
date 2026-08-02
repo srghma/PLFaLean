@@ -1,8 +1,9 @@
 module
-import Mathlib.Data.List.Basic
-import Mathlib.Data.Nat.Basic
-import Plfl.ReallyUntypedLambda.Ernius.Atom
-import Plfl.ReallyUntypedLambda.Ernius.Chi
+public import Mathlib.Data.List.Basic
+public import Mathlib.Data.Nat.Basic
+public import Plfl.ReallyUntypedLambda.Ernius.Atom
+public import Plfl.ReallyUntypedLambda.Ernius.Chi
+@[expose] public section
 
 namespace Term
 
