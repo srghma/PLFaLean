@@ -1,7 +1,6 @@
 -- https://github.com/ernius/formalmetatheory-nominal-Church-Rosser/blob/master/Atom.lagda
 -- https://github.com/ernius/formalmetatheory-nominal-Church-Rosser/blob/master/Term.lagda
 
--- https://github.com/Danelnov/Lambda-Calculus-Formalization/blob/master/Lambda/Defs.lean
 module
 @[expose] public section
 

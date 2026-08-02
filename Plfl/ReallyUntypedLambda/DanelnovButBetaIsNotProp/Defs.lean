@@ -1,3 +1,5 @@
+-- https://github.com/Danelnov/Lambda-Calculus-Formalization/blob/master/Lambda/Defs.lean
+
 module
 
 public import Plfl.ReallyUntypedLambda.DanelnovButBetaIsNotProp.Diamond
