@@ -289,7 +289,7 @@ def Term.beq : ∀ {n1 : Nat} {s1 : BitVec n1} {d1 : Nat} {u1 : BitVec d1}
     Term s1 u1 → Term s2 u2 → Bool
   | _, _, _, _, _, _, _, _, Term.var i, t2 =>
       match t2 with
-      | Term.var j => i.val == j.val
+      | Term.var targetIndex => i.val == targetIndex.val
       | _ => false
   | _, _, _, _, _, _, _, _, Term.abs P, t2 =>
       match t2 with
@@ -327,9 +327,9 @@ theorem termBEq_heq : ∀ {n : Nat} {s1 : BitVec n} {d1 : Nat} {u1 : BitVec d1} 
   | var i =>
     intro s2 d2 u2 t2 h
     cases t2 with
-    | var j =>
-      change (i.val == j.val) = true at h
-      have hij : i = j := Fin.ext (eq_of_beq h)
+    | var targetIndex =>
+      change (i.val == targetIndex.val) = true at h
+      have hij : i = targetIndex := Fin.ext (eq_of_beq h)
       subst hij
       exact ⟨rfl, rfl, HEq.rfl, HEq.rfl⟩
     | abs Q => exact Bool.noConfusion h
@@ -337,7 +337,7 @@ theorem termBEq_heq : ∀ {n : Nat} {s1 : BitVec n} {d1 : Nat} {u1 : BitVec d1} 
   | abs P ih =>
     intro s2 d2 u2 t2 h
     cases t2 with
-    | var j => exact Bool.noConfusion h
+    | var targetIndex => exact Bool.noConfusion h
     | abs Q =>
       change Term.beq P Q = true at h
       obtain ⟨hs, hd, hu, hheq⟩ := ih Q h
@@ -350,7 +350,7 @@ theorem termBEq_heq : ∀ {n : Nat} {s1 : BitVec n} {d1 : Nat} {u1 : BitVec d1} 
   | app P1 P2 ih1 ih2 =>
     intro s2 d2 u2 t2 h
     cases t2 with
-    | var j => exact Bool.noConfusion h
+    | var targetIndex => exact Bool.noConfusion h
     | abs Q => exact Bool.noConfusion h
     | app Q1 Q2 =>
       change (Term.beq P1 Q1 && Term.beq P2 Q2) = true at h
@@ -390,14 +390,14 @@ instance {n : Nat} {s : BitVec n} {d : Nat} {u : BitVec d} : DecidableEq (Term s
 abbrev insertBitAt (c : Nat) {n : Nat} (s : BitVec n) (h : c ≤ n) : BitVec (n + 1) :=
   ((s.extractLsb' c (n - c)) ++ (0#1) ++ (s.extractLsb' 0 c)).cast (by omega)
 
-abbrev removeBitAt (j : Nat) {n : Nat} (s : BitVec (n + 1)) (h : j ≤ n) : BitVec n :=
-  ((s.extractLsb' (j + 1) (n - j)) ++ (s.extractLsb' 0 j)).cast (by omega)
+abbrev removeBitAt (targetIndex : Nat) {n : Nat} (s : BitVec (n + 1)) (h : targetIndex ≤ n) : BitVec n :=
+  ((s.extractLsb' (targetIndex + 1) (n - targetIndex)) ++ (s.extractLsb' 0 targetIndex)).cast (by omega)
 
 abbrev shiftMask (c : Nat) {n : Nat} (s : BitVec n) (h : c ≤ n) : BitVec (n + 1) :=
   insertBitAt c s h
 
-abbrev substMask (j : Nat) {n : Nat} (sN : BitVec n) (sP : BitVec (n + 1)) (h : j ≤ n) : BitVec n :=
-  removeBitAt j sP h ||| (if sP.getLsb ⟨j, by omega⟩ then sN else 0#n)
+abbrev substMask (targetIndex : Nat) {n : Nat} (newPartBitVec : BitVec n) (beforeBitVec : BitVec (n + 1)) (h : targetIndex ≤ n) : BitVec n :=
+  removeBitAt targetIndex beforeBitVec h ||| (if beforeBitVec.getLsb ⟨targetIndex, by omega⟩ then newPartBitVec else 0#n)
 
 #guard (substMask 0 0b100#3 0b001#4 (by decide) = 0b100#3) -- [λ] λ λ | #2
 #guard (substMask 1 0b100#3 0b001#4 (by decide) = 0b1#3) -- [λ] λ λ | #2
@@ -410,7 +410,7 @@ theorem popScope_eq_removeBitAt {n : Nat} (s : BitVec (n + 1)) :
 
 theorem shiftMask_singleton_ge {n : Nat} (c : Nat) (i : Fin n) (h : i.val ≥ c) (hc : c ≤ n) :
     shiftMask c (singletonMask n i) hc = singletonMask (n+1) ⟨i.val + 1, by omega⟩ := by
-  ext j hj
+  ext targetIndex hj
   unfold shiftMask insertBitAt singletonMask
   simp only [BitVec.getElem_cast, BitVec.getElem_append, BitVec.getElem_extractLsb',
     BitVec.getElem_shiftLeft, BitVec.getElem_one]
@@ -424,7 +424,7 @@ theorem shiftMask_singleton_ge {n : Nat} (c : Nat) (i : Fin n) (h : i.val ≥ c)
 
 theorem shiftMask_singleton_lt {n : Nat} (c : Nat) (i : Fin n) (h : ¬ i.val ≥ c) (hc : c ≤ n) :
     shiftMask c (singletonMask n i) hc = singletonMask (n+1) ⟨i.val, by omega⟩ := by
-  ext j hj
+  ext targetIndex hj
   unfold shiftMask insertBitAt singletonMask
   simp only [BitVec.getElem_cast, BitVec.getElem_append, BitVec.getElem_extractLsb',
     BitVec.getElem_shiftLeft, BitVec.getElem_one]
@@ -438,7 +438,7 @@ theorem shiftMask_singleton_lt {n : Nat} (c : Nat) (i : Fin n) (h : ¬ i.val ≥
 
 theorem shiftMask_mergeScope {n : Nat} (c : Nat) (s1 s2 : BitVec n) (hc : c ≤ n) :
     shiftMask c (mergeScope s1 s2) hc = mergeScope (shiftMask c s1 hc) (shiftMask c s2 hc) := by
-  ext j hj
+  ext targetIndex hj
   unfold shiftMask insertBitAt mergeScope
   simp only [BitVec.getElem_cast, BitVec.getElem_append, BitVec.getElem_extractLsb',
     BitVec.getElem_or]
@@ -450,8 +450,8 @@ theorem shiftMask_mergeScope {n : Nat} (c : Nat) (s1 s2 : BitVec n) (hc : c ≤ 
     simp_all only [Nat.not_lt]
     grind only
 
-theorem substMask_singleton_eq {n : Nat} (j : Nat) (hj : j ≤ n) (sN : BitVec n) :
-    substMask j sN (singletonMask (n + 1) ⟨j, by omega⟩) hj = sN := by
+theorem substMask_singleton_eq {n : Nat} (targetIndex : Nat) (hj : targetIndex ≤ n) (newPartBitVec : BitVec n) :
+    substMask targetIndex newPartBitVec (singletonMask (n + 1) ⟨targetIndex, by omega⟩) hj = newPartBitVec := by
   ext k hk
   unfold substMask removeBitAt singletonMask
   simp only [BitVec.getElem_or, BitVec.getElem_cast, BitVec.getElem_append, BitVec.getElem_extractLsb',
@@ -461,8 +461,8 @@ theorem substMask_singleton_eq {n : Nat} (j : Nat) (hj : j ≤ n) (sN : BitVec n
   intro a a_1 a_2 a_3
   grind only
 
-theorem substMask_singleton_gt {n : Nat} (j : Nat) (i : Fin (n + 1)) (h : i.val > j) (hj : j ≤ n) (sN : BitVec n) :
-    substMask j sN (singletonMask (n + 1) i) hj = singletonMask n ⟨i.val - 1, by omega⟩ := by
+theorem substMask_singleton_gt {n : Nat} (targetIndex : Nat) (i : Fin (n + 1)) (h : i.val > targetIndex) (hj : targetIndex ≤ n) (newPartBitVec : BitVec n) :
+    substMask targetIndex newPartBitVec (singletonMask (n + 1) i) hj = singletonMask n ⟨i.val - 1, by omega⟩ := by
   ext k hk
   unfold substMask removeBitAt singletonMask
   simp only [BitVec.getElem_or, BitVec.getElem_cast, BitVec.getElem_append, BitVec.getElem_extractLsb',
@@ -476,8 +476,8 @@ theorem substMask_singleton_gt {n : Nat} (j : Nat) (i : Fin (n + 1)) (h : i.val 
     simp_all only [Nat.not_lt]
     grind only [= Lean.Grind.toInt_fin]
 
-theorem substMask_singleton_lt {n : Nat} (j : Nat) (i : Fin (n + 1)) (h : i.val < j) (hj : j ≤ n) (sN : BitVec n) :
-    substMask j sN (singletonMask (n + 1) i) hj = singletonMask n ⟨i.val, by omega⟩ := by
+theorem substMask_singleton_lt {n : Nat} (targetIndex : Nat) (i : Fin (n + 1)) (h : i.val < targetIndex) (hj : targetIndex ≤ n) (newPartBitVec : BitVec n) :
+    substMask targetIndex newPartBitVec (singletonMask (n + 1) i) hj = singletonMask n ⟨i.val, by omega⟩ := by
   ext k hk
   unfold substMask removeBitAt singletonMask
   simp only [BitVec.getElem_or, BitVec.getElem_cast, BitVec.getElem_append, BitVec.getElem_extractLsb',
@@ -505,8 +505,8 @@ theorem substMask_singleton_lt {n : Nat} (j : Nat) (i : Fin (n + 1)) (h : i.val 
       simp_all only [not_and]
       grind only [= Lean.Grind.toInt_fin]
 
-theorem substMask_mergeScope {n : Nat} (j : Nat) (sN : BitVec n) (s1 s2 : BitVec (n + 1)) (hj : j ≤ n) :
-    substMask j sN (mergeScope s1 s2) hj = mergeScope (substMask j sN s1 hj) (substMask j sN s2 hj) := by
+theorem substMask_mergeScope {n : Nat} (targetIndex : Nat) (newPartBitVec : BitVec n) (s1 s2 : BitVec (n + 1)) (hj : targetIndex ≤ n) :
+    substMask targetIndex newPartBitVec (mergeScope s1 s2) hj = mergeScope (substMask targetIndex newPartBitVec s1 hj) (substMask targetIndex newPartBitVec s2 hj) := by
   ext k hk
   unfold substMask removeBitAt mergeScope
   simp only [BitVec.getElem_or, BitVec.getElem_cast, BitVec.getElem_append, BitVec.getElem_extractLsb',
@@ -577,8 +577,8 @@ theorem popScope_getElem {n : Nat} (s : BitVec (n + 1)) (k : Nat) (hk : k < n) :
   simp_all only [BitVec.getLsbD_ushiftRight]
   simp +arith only [Nat.add_lt_add_iff_right, BitVec.getLsbD_eq_getElem, hk]
 
-theorem removeBitAt_getElem {n : Nat} (j : Nat) (s : BitVec (n + 1)) (hj : j ≤ n) (k : Nat) (hk : k < n) :
-    (removeBitAt j s hj)[k] = if k < j then s[k] else s[k + 1] := by
+theorem removeBitAt_getElem {n : Nat} (targetIndex : Nat) (s : BitVec (n + 1)) (hj : targetIndex ≤ n) (k : Nat) (hk : k < n) :
+    (removeBitAt targetIndex s hj)[k] = if k < targetIndex then s[k] else s[k + 1] := by
   unfold removeBitAt
   simp only [BitVec.getElem_cast, BitVec.getElem_append, BitVec.getElem_extractLsb']
   simp_all only [Nat.zero_add, dite_eq_ite]
@@ -588,15 +588,15 @@ theorem removeBitAt_getElem {n : Nat} (j : Nat) (s : BitVec (n + 1)) (hj : j ≤
     simp_all only [Nat.not_lt]
     simp +arith only [Nat.add_sub_cancel', Nat.add_lt_add_iff_right, BitVec.getLsbD_eq_getElem, h, hk]
 
-theorem shiftMask_zero_getElem_succ {n : Nat} (sN : BitVec n) (k : Nat) (hk : k < n) :
-    (shiftMask 0 sN (by omega))[k + 1] = sN[k] := by
+theorem shiftMask_zero_getElem_succ {n : Nat} (newPartBitVec : BitVec n) (k : Nat) (hk : k < n) :
+    (shiftMask 0 newPartBitVec (by omega))[k + 1] = newPartBitVec[k] := by
   unfold shiftMask insertBitAt
   simp only [BitVec.getElem_cast, BitVec.getElem_append, BitVec.getElem_extractLsb']
   simp_all only [Nat.not_lt_zero, ↓reduceDIte, Nat.sub_zero, Nat.lt_one_iff, Nat.add_eq_zero_iff, Nat.succ_ne_self, and_false, Nat.add_one_sub_one, Nat.zero_add, BitVec.getLsbD_eq_getElem]
 
 theorem popScope_shiftMask {n : Nat} (c : Nat) (s : BitVec (n + 1)) (hc : c ≤ n) :
     popScope (shiftMask (c + 1) s (by omega)) = shiftMask c (popScope s) (by omega) := by
-  ext j hj
+  ext targetIndex hj
   unfold popScope shiftMask insertBitAt
   simp only [BitVec.getElem_cast, BitVec.getElem_append, BitVec.getElem_extractLsb']
   simp_all only [BitVec.truncate_eq_setWidth, BitVec.getElem_setWidth, BitVec.getLsbD_ushiftRight,
@@ -608,8 +608,8 @@ theorem popScope_shiftMask {n : Nat} (c : Nat) (s : BitVec (n + 1)) (hc : c ≤ 
     simp_all only [Nat.not_lt]
     grind only [= BitVec.getLsbD_of_ge, = BitVec.getLsbD_eq_getElem, = BitVec.append_assoc, = BitVec.cast_eq, = BitVec.getLsbD_append, = BitVec.getLsbD_extractLsb', = BitVec.getLsbD_zero]
 
-theorem getLsb_zero_substMask {n : Nat} (j : Nat) (sN : BitVec n) (sP : BitVec (n + 1 + 1)) (hj : j ≤ n) :
-    (substMask (j + 1) (shiftMask 0 sN (by omega)) sP (by omega)).getLsb 0 = sP.getLsb 0 := by
+theorem getLsb_zero_substMask {n : Nat} (targetIndex : Nat) (newPartBitVec : BitVec n) (beforeBitVec : BitVec (n + 1 + 1)) (hj : targetIndex ≤ n) :
+    (substMask (targetIndex + 1) (shiftMask 0 newPartBitVec (by omega)) beforeBitVec (by omega)).getLsb 0 = beforeBitVec.getLsb 0 := by
   unfold substMask removeBitAt shiftMask insertBitAt
   simp only [BitVec.getLsb_eq_getElem, Fin.getElem_fin, BitVec.getElem_or, BitVec.getElem_cast,
     BitVec.getElem_append, BitVec.getElem_extractLsb']
@@ -621,9 +621,9 @@ theorem getLsb_zero_substMask {n : Nat} (j : Nat) (sN : BitVec n) (sP : BitVec (
     simp [BitVec.getElem_append, BitVec.getElem_zero] at a
   next h => simp_all only [BitVec.getElem_zero, Bool.false_eq_true]
 
-theorem popScope_substMask {n : Nat} (j : Nat) (sN : BitVec n) (s : BitVec (n + 1 + 1)) (hj : j ≤ n) :
-    popScope (substMask (j + 1) (shiftMask 0 sN (by omega)) s (by omega))
-      = substMask j sN (popScope s) hj := by
+theorem popScope_substMask {n : Nat} (targetIndex : Nat) (newPartBitVec : BitVec n) (s : BitVec (n + 1 + 1)) (hj : targetIndex ≤ n) :
+    popScope (substMask (targetIndex + 1) (shiftMask 0 newPartBitVec (by omega)) s (by omega))
+      = substMask targetIndex newPartBitVec (popScope s) hj := by
   ext k hk
   rw [popScope_getElem _ k hk]
   unfold substMask removeBitAt shiftMask insertBitAt
@@ -727,34 +727,34 @@ def Term.size : Term s u → Nat
   | Term.abs P => 1 + P.size
   | Term.app P Q => 1 + P.size + Q.size
 
-def Term.subst (j : Nat) {n : Nat} {sN : BitVec n} {dN : Nat} {uN : BitVec dN}
-    (N : Term sN uN) (hj : j ≤ n)
-    {sP : BitVec (n + 1)} {dP : Nat} {uP : BitVec dP}
-    (M : Term sP uP) :
-    (d' : Nat) × (u' : BitVec d') × Term (substMask j sN sP hj) u' :=
-  match sP, dP, uP, M with
+def Term.subst (targetIndex : Nat) {n : Nat} {newPartBitVec : BitVec n} {dN : Nat} {uN : BitVec dN}
+    (N : Term newPartBitVec uN) (hj : targetIndex ≤ n)
+    {beforeBitVec : BitVec (n + 1)} {dP : Nat} {uP : BitVec dP}
+    (M : Term beforeBitVec uP) :
+    (d' : Nat) × (u' : BitVec d') × Term (substMask targetIndex newPartBitVec beforeBitVec hj) u' :=
+  match beforeBitVec, dP, uP, M with
   | _, _, _, Term.var i =>
-      if h_eq : i.val = j then
+      if h_eq : i.val = targetIndex then
         ⟨dN, uN, castTerm N (by
-          have h_i : i = ⟨j, by omega⟩ := Fin.ext h_eq
-          rw [h_i]; exact (substMask_singleton_eq j hj sN).symm) rfl⟩
-      else if h_gt : i.val > j then
+          have h_i : i = ⟨targetIndex, by omega⟩ := Fin.ext h_eq
+          rw [h_i]; exact (substMask_singleton_eq targetIndex hj newPartBitVec).symm) rfl⟩
+      else if h_gt : i.val > targetIndex then
         ⟨0, 0b0#0, castTerm (Term.var ⟨i.val - 1, by omega⟩)
-          (substMask_singleton_gt j i h_gt hj sN).symm rfl⟩
+          (substMask_singleton_gt targetIndex i h_gt hj newPartBitVec).symm rfl⟩
       else
         ⟨0, 0b0#0, castTerm (Term.var ⟨i.val, by omega⟩)
-          (substMask_singleton_lt j i (by omega) hj sN).symm rfl⟩
+          (substMask_singleton_lt targetIndex i (by omega) hj newPartBitVec).symm rfl⟩
   | _, _, _, @Term.app _ _ _ s1 s2 _ _ P Q =>
-      let ⟨dP', uP', P'⟩ := Term.subst j N hj P
-      let ⟨dQ', uQ', Q'⟩ := Term.subst j N hj Q
+      let ⟨dP', uP', P'⟩ := Term.subst targetIndex N hj P
+      let ⟨dQ', uQ', Q'⟩ := Term.subst targetIndex N hj Q
       ⟨max dP' dQ', mergeUsage uP' uQ',
-        castTerm (Term.app P' Q') (substMask_mergeScope j sN s1 s2 hj).symm rfl⟩
+        castTerm (Term.app P' Q') (substMask_mergeScope targetIndex newPartBitVec s1 s2 hj).symm rfl⟩
   | _, _, _, @Term.abs _ _ s_abs u_abs P =>
       let N' := Term.shift 0 (by omega) N
-      let ⟨dP', uP', P'⟩ := Term.subst (j + 1) N' (by omega) P
+      let ⟨dP', uP', P'⟩ := Term.subst (targetIndex + 1) N' (by omega) P
       ⟨dP' + 1, recordBinderUsage (s_abs.getLsb 0) uP',
-        castTerm (Term.abs P') (popScope_substMask j sN s_abs hj)
-          (by rw [getLsb_zero_substMask j sN s_abs hj])⟩
+        castTerm (Term.abs P') (popScope_substMask targetIndex newPartBitVec s_abs hj)
+          (by rw [getLsb_zero_substMask targetIndex newPartBitVec s_abs hj])⟩
 termination_by M.size
 decreasing_by (all_goals (simp [Term.size]; try omega))
 
@@ -767,14 +767,14 @@ decreasing_by (all_goals (simp [Term.size]; try omega))
 -- 2. Inner variable remains unchanged: x_0[1 := N] ⟹ x_0
 #guard
   let N : Term (0b100#3) (0#0) := ##[3] 2  -- [λ] λ λ | #2
-  let P : Term (0b0001#4) (0#0) := ##[4] 0 -- λ λ [λ] λ | #0 (subst at j=1: 2nd λ from right)
-  Term.beq (Term.subst 1 N (by omega) P).2.2 (##[3] 0) -- λ λ [λ] | #0 (j=0 < 1: untouched, scope contracts 4->3)
+  let P : Term (0b0001#4) (0#0) := ##[4] 0 -- λ λ [λ] λ | #0 (subst at targetIndex=1: 2nd λ from right)
+  Term.beq (Term.subst 1 N (by omega) P).2.2 (##[3] 0) -- λ λ [λ] | #0 (targetIndex=0 < 1: untouched, scope contracts 4->3)
 
 -- 3. Free variable decrement: x_2[0 := N] ⟹ x_1
 #guard
   let N : Term (0b100#3) (0#0) := ##[3] 2  -- [λ] λ λ | #2
-  let P : Term (0b0100#4) (0#0) := ##[4] 2 -- λ [λ] λ λ | #2 (subst at j=0: 1st λ from right)
-  Term.beq (Term.subst 0 N (by omega) P).2.2 (##[3] 1) -- λ [λ] λ | #1 (j=2 > 0: index decrements 2->1)
+  let P : Term (0b0100#4) (0#0) := ##[4] 2 -- λ [λ] λ λ | #2 (subst at targetIndex=0: 1st λ from right)
+  Term.beq (Term.subst 0 N (by omega) P).2.2 (##[3] 1) -- λ [λ] λ | #1 (targetIndex=2 > 0: index decrements 2->1)
 
 -- 4. Substitution under λ-abstraction: (λ. x_1)[0 := N] ⟹ λ. N_shifted
 #guard
@@ -797,9 +797,9 @@ decreasing_by (all_goals (simp [Term.size]; try omega))
   let expected : Term (0b101#3) (0#0) := ⟦ ##[3] 2 ⬝ ##[3] 0 ⟧ -- [λ] λ [λ] | #2 #0
   Term.beq (Term.subst 0 N (by omega) body).2.2 expected
 
-def Term.betaSubst {n : Nat} {sP : BitVec (n + 1)} {dP : Nat} {uP : BitVec dP}
-    (M : Term sP uP) {sN : BitVec n} {dN : Nat} {uN : BitVec dN} (N : Term sN uN) :
-    Term (substMask 0 sN sP (by omega)) (Term.subst 0 N (by omega) M).2.1 :=
+def Term.betaSubst {n : Nat} {beforeBitVec : BitVec (n + 1)} {dP : Nat} {uP : BitVec dP}
+    (M : Term beforeBitVec uP) {newPartBitVec : BitVec n} {dN : Nat} {uN : BitVec dN} (N : Term newPartBitVec uN) :
+    Term (substMask 0 newPartBitVec beforeBitVec (by omega)) (Term.subst 0 N (by omega) M).2.1 :=
   (Term.subst 0 N (by omega) M).2.2
 
 notation:70 M " [" N "]" => Term.betaSubst M N
@@ -811,9 +811,9 @@ infixl:65 " →β " => BetaStep
 inductive BetaStep : ∀ {n1 : Nat} {s1 : BitVec n1} {d1 : Nat} {u1 : BitVec d1}
                        {n2 : Nat} {s2 : BitVec n2} {d2 : Nat} {u2 : BitVec d2},
     Term s1 u1 → Term s2 u2 → Prop where
-  | head {n : Nat} {sP : BitVec (n+1)} {dP : Nat} {uP : BitVec dP}
-      {sN : BitVec n} {dN : Nat} {uN : BitVec dN}
-      (P : Term sP uP) (N : Term sN uN) :
+  | head {n : Nat} {beforeBitVec : BitVec (n+1)} {dP : Nat} {uP : BitVec dP}
+      {newPartBitVec : BitVec n} {dN : Nat} {uN : BitVec dN}
+      (P : Term beforeBitVec uP) (N : Term newPartBitVec uN) :
       ((ƛ P) ⬝ N) →β P [N]
   | app_left {P P' : _} (Q : Term _ _) : (P →β P') → (P ⬝ Q) →β (P' ⬝ Q)
   | app_right (P : Term _ _) {Q Q' : _} : (Q →β Q') → (P ⬝ Q) →β (P ⬝ Q')

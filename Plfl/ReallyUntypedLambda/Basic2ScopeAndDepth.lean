@@ -128,39 +128,108 @@ def RenameWeaken.succ (m : Nat) : RenameWeaken m (m + 1) where
   lt  := Nat.lt_succ_self m
   map := Fin.succ
 
+-- 1. WEAKENING SUBSTITUTION (n < m)
+structure SubstWeaken (n m : Nat) where
+  lt  : n < m
+  map : Fin n → (d : Nat) × Term m d
+
+def SubstWeaken.ext {n m : Nat} (σ : SubstWeaken n m) : SubstWeaken (n + 1) (m + 1) where
+  lt  := Nat.succ_lt_succ σ.lt
+  map := Fin.cases ⟨0, # 0⟩ (fun i => let ⟨d, t⟩ := σ.map i; ⟨d, renameWeaken (RenameWeaken.succ m) t⟩)
+
+def substWeaken {n m : Nat} (σ : SubstWeaken n m) : ∀ {d : Nat}, Term n d → (d' : Nat) × Term m d'
+  | _, Term.var i => σ.map i
+  | _, ƛ M        => let ⟨d', M'⟩ := substWeaken σ.ext M; ⟨d' + 1, ƛ M'⟩
+  | _, M ⬝ N      => let ⟨dM', M'⟩ := substWeaken σ M; let ⟨dN', N'⟩ := substWeaken σ N; ⟨max dM' dN', M' ⬝ N'⟩
+
+-- 2. SAME-SCOPE SUBSTITUTION (n = m)
+structure SubstSame (n : Nat) where
+  map : Fin n → (d : Nat) × Term n d
+
+def SubstSame.ext {n : Nat} (σ : SubstSame n) : SubstSame (n + 1) where
+  map := Fin.cases ⟨0, # 0⟩ (fun i => let ⟨d, t⟩ := σ.map i; ⟨d, renameWeaken (RenameWeaken.succ n) t⟩)
+
+def substSame {n : Nat} (σ : SubstSame n) : ∀ {d : Nat}, Term n d → (d' : Nat) × Term n d'
+  | _, Term.var i => σ.map i
+  | _, ƛ M        => let ⟨d', M'⟩ := substSame σ.ext M; ⟨d' + 1, ƛ M'⟩
+  | _, M ⬝ N      => let ⟨dM', M'⟩ := substSame σ M; let ⟨dN', N'⟩ := substSame σ N; ⟨max dM' dN', M' ⬝ N'⟩
+
+-- 3. CONTRACTING SUBSTITUTION (n > m)
+structure SubstContract (n m : Nat) where
+  gt  : n > m
+  map : Fin n → (d : Nat) × Term m d
+
+def SubstContract.ext {n m : Nat} (σ : SubstContract n m) : SubstContract (n + 1) (m + 1) where
+  gt  := Nat.succ_lt_succ σ.gt
+  map := Fin.cases ⟨0, # 0⟩ (fun i => let ⟨d, t⟩ := σ.map i; ⟨d, renameWeaken (RenameWeaken.succ m) t⟩)
+
+def substContract {n m : Nat} (σ : SubstContract n m) : ∀ {d : Nat}, Term n d → (d' : Nat) × Term m d'
+  | _, Term.var i =>
+    σ.map i
+  | _, ƛ M =>
+    let ⟨d', M'⟩ := substContract σ.ext M;
+    ⟨d' + 1, ƛ M'⟩
+  | _, M ⬝ N =>
+    let ⟨dM', M'⟩ := substContract σ M;
+    let ⟨dN', N'⟩ := substContract σ N;
+    ⟨max dM' dN', M' ⬝ N'⟩
+
 namespace Term
 
--- Substitution maps (Fin n → Σ d, Term m d)
-def Subst (n m : Nat) : Type := Fin n → (d : Nat) × Term m d
-
-def exts {n m : Nat} (σ : Subst n m) : Subst (n + 1) (m + 1)
-  | ⟨0, _⟩     => ⟨0, # ⟨0, Nat.succ_pos _⟩⟩
-  | ⟨i + 1, h⟩ =>
-      let ⟨d, t⟩ := σ ⟨i, Nat.lt_of_succ_lt_succ h⟩
-      ⟨d, renameWeaken (RenameWeaken.succ m) t⟩
-
-def subst {n m : Nat} (σ : Subst n m) : ∀ {d : Nat}, Term n d → (d' : Nat) × Term m d'
-  | _, Term.var i => σ i
-  | _, ƛ M        => let ⟨d', M'⟩ := subst (exts σ) M; ⟨d' + 1, ƛ M'⟩
-  | _, M ⬝ N      => let ⟨dM', M'⟩ := subst σ M; let ⟨dN', N'⟩ := subst σ N; ⟨max dM' dN', M' ⬝ N'⟩
-
 -- Substitution of top variable (Fin (n+1) → Σ d, Term n d)
-def substZero {n dN : Nat} (N : Term n dN) : Subst (n + 1) n
-  | ⟨0, _⟩     => ⟨dN, N⟩
-  | ⟨i + 1, h⟩ => ⟨0, # ⟨i, Nat.lt_of_succ_lt_succ h⟩⟩
+def mkSubstZero {n dN : Nat} (N : Term n dN) : SubstContract (n + 1) n where
+  gt  := Nat.lt_succ_self n
+  map := Fin.cases ⟨dN, N⟩ (fun i => ⟨0, # i⟩)
 
--- Clean single-substitution operator
+----- NO RUN RUNNER PATTERN
+def size : Term n d → Nat
+  | Term.var _ => 1
+  | ƛ P => 1 + P.size
+  | P ⬝ Q => 1 + P.size + Q.size
+
+def betaSubstGo
+  (targetIndex : Nat)
+  {outerScope argDepth : Nat}
+  (argTerm : Term outerScope argDepth)
+  (h_target : targetIndex ≤ outerScope) :
+  ∀ {bodyDepth : Nat},
+  Term (outerScope + 1) bodyDepth →
+  (resultDepth : Nat) × Term outerScope resultDepth
+  | _, Term.var varIdx =>
+      if h_eq : varIdx.val = targetIndex then
+        ⟨argDepth, argTerm⟩
+      else if h_gt : varIdx.val > targetIndex then
+        ⟨0, Term.var ⟨varIdx.val - 1, by omega⟩⟩
+      else
+        ⟨0, Term.var ⟨varIdx.val, by omega⟩⟩
+  | _, ƛ body =>
+      let shiftedArg := renameWeaken (RenameWeaken.succ outerScope) argTerm
+      let ⟨substBodyDepth, substBody⟩ := betaSubstGo (targetIndex + 1) shiftedArg (by omega) body
+      ⟨substBodyDepth + 1, ƛ substBody⟩
+  | _, leftBody ⬝ rightBody =>
+      let ⟨leftDepth, leftSubst⟩ := betaSubstGo targetIndex argTerm h_target leftBody
+      let ⟨rightDepth, rightSubst⟩ := betaSubstGo targetIndex argTerm h_target rightBody
+      ⟨max leftDepth rightDepth, leftSubst ⬝ rightSubst⟩
+termination_by _ bodyTerm => bodyTerm.size
+decreasing_by (all_goals (simp [Term.size]; try omega))
+----- NO RUN RUNNER PATTERN END
+
+-- will subst vars with 0 with target term and -1 all others
 def betaSubst {n dM dN : Nat} (M : Term (n + 1) dM) (N : Term n dN) : (d' : Nat) × Term n d' :=
-  subst (substZero N) M
+  -- CAN USE THIS INSTEAD
+  -- substContract (mkSubstZero N) M
+  -- OR THIS
+  betaSubstGo 0 N (by omega) M
 
 end Term
 
-notation:70 M " [" N "]" => (Term.betaSubst M N)
+-- notation:70 M " [" N "]" => (Term.betaSubst M N).2 -- impossible
+macro:70 M:term "[" N:term "]" : term => `((Term.betaSubst $M $N).2)
 
 -- Standard Single-Step Beta Reduction (Beta)
 inductive Beta : ∀ {n d1 d2 : Nat}, Term n d1 → Term n d2 → Prop where
   | basis {n dM dN : Nat} (M : Term (n + 1) dM) (N : Term n dN) :
-      Beta ((ƛ M) ⬝ N) (M[N].2)
+      Beta ((ƛ M) ⬝ N) (M[N])
   | appr {n d1 d2 d3 : Nat} {M : Term n d1} {N : Term n d2} (L : Term n d3) :
       Beta M N → Beta (M ⬝ L) (N ⬝ L)
   | appl {n d1 d2 d3 : Nat} {M : Term n d1} {N : Term n d2} (L : Term n d3) :
@@ -182,7 +251,7 @@ inductive BetaP : ∀ {n d1 d2 : Nat}, Term n d1 → Term n d2 → Prop where
   | app {n dM dM' dN dN' : Nat} {M : Term n dM} {M' : Term n dM'} {N : Term n dN} {N' : Term n dN'} :
       BetaP M M' → BetaP N N' → BetaP (M ⬝ N) (M' ⬝ N')
   | subst {n dM dM' dN dN' : Nat} {M : Term (n + 1) dM} {M' : Term (n + 1) dM'} {N : Term n dN} {N' : Term n dN'} :
-      BetaP M M' → BetaP N N' → BetaP ((ƛ M) ⬝ N) (M'[N'].2)
+      BetaP M M' → BetaP N N' → BetaP ((ƛ M) ⬝ N) (M'[N'])
 
 infixl:65 " →βp " => BetaP
 
