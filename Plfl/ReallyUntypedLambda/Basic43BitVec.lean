@@ -54,7 +54,7 @@ abbrev mergeUsage {d1 d2 : Nat} (u1 : BitVec d1) (u2 : BitVec d2) : BitVec (max 
 #guard mergeUsage (0b11#2) (0b1#1) = 0b11#2
 
 /-! ## The inductive family, with n and d auto-bound (inferred from the BitVec widths) -/
-
+-- TODO(this is stupid. there is really no need to track bounded variables)
 /--
 `Term s u`:
   the scope size `n` and abstraction depth `d` are inferred automatically
