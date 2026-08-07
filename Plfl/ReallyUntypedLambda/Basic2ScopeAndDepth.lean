@@ -1,6 +1,7 @@
 module
 public import Mathlib.Data.Nat.Basic
 public import Mathlib.Logic.Relation
+import Aesop
 
 @[expose] public section
 
@@ -26,28 +27,28 @@ theorem max_var_bound {n d : Nat} (_ : Term n d) : n ≤ n + d := by exact Nat.l
 
 prefix:100 "ƛ " => Term.abs
 infixl:70 " ⬝ " => Term.app
-prefix:100 "# " => Term.var
-macro:100 "## " n:term:max : term => `(Term.var (Fin.mk $n (by decide)))
+prefix:100 "v#" => Term.var
+macro:100 "v##" n:term:max : term => `(Term.var (Fin.mk $n (by decide)))
 
 namespace Term
 
 -- 1. Identity Function: ƛx. x
 -- Type: Term 0
-def id : Term 0 1 := ƛ (# 0)
+def id : Term 0 1 := ƛ (v#0)
 
 -- 2. Constant Function: ƛx. ƛy. x
 -- Type: Term 0
-def const : Term 0 2 := ƛ (ƛ (## 1))
+def const : Term 0 2 := ƛ (ƛ (v## 1))
 
 -- 3. Church Numerals: ƛf. ƛx. f^n x
 -- Zero: ƛf. ƛx. x
-def zero : Term 0 2 := ƛ (ƛ (# 0))
+def zero : Term 0 2 := ƛ (ƛ (v#0))
 
 -- One: ƛf. ƛx. f x
-def one : Term 0 2 := ƛ (ƛ (## 1 ⬝ # 0))
+def one : Term 0 2 := ƛ (ƛ (v##1 ⬝ v#0))
 
 -- Two: ƛf. ƛx. f (f x)
-def two : Term 0 2 := ƛ (ƛ (## 1 ⬝ (## 1 ⬝ # 0)))
+def two : Term 0 2 := ƛ (ƛ (v##1 ⬝ (v##1 ⬝ v#0)))
 
 -- 4. Church Successor: ƛn. ƛf. ƛx. f (n f x)
 -- Type: Term 0
@@ -55,8 +56,8 @@ def succ : Term 0 3 :=
   ƛ (             -- n is var 2
     ƛ (           -- f is var 1
       ƛ (         -- x is var 0
-        ## 1 ⬝
-        ((## 2 ⬝ ## 1) ⬝ # 0)
+        v## 1 ⬝
+        ((v## 2 ⬝ v## 1) ⬝ v# 0)
       )
     )
   )
@@ -67,7 +68,8 @@ def freeTerm : Term 2 0 := ## 0 ⬝ ## 1
 -- A term with 1 free variable, depth 1 (λy. y ⬝ x0):
 def boundAndFree : Term 1 1 := ƛ (# 0 ⬝ ## 1)
 
-end Term
+namespace BetaWay1
+
 
 -- 1. WEAKENING / EXPANSION (n < m)
 -- Inserts new unused variables into scope.
@@ -179,19 +181,21 @@ def substContract {n m : Nat} (σ : SubstContract n m) : ∀ {d : Nat}, Term n d
     let ⟨dN', N'⟩ := substContract σ N;
     ⟨max dM' dN', M' ⬝ N'⟩
 
-namespace Term
-
 -- Substitution of top variable (Fin (n+1) → Σ d, Term n d)
 def mkSubstZero {n dN : Nat} (N : Term n dN) : SubstContract (n + 1) n where
   gt  := Nat.lt_succ_self n
   map := Fin.cases ⟨dN, N⟩ (fun i => ⟨0, # i⟩)
 
------ NO RUN RUNNER PATTERN
+end BetaWay1
+
 def size : Term n d → Nat
   | Term.var _ => 1
   | ƛ P => 1 + P.size
   | P ⬝ Q => 1 + P.size + Q.size
 
+namespace BetaWay2
+
+----- RUNNER PATTERN
 def betaSubstGo
   (targetIndex : Nat)
   {outerScope argDepth : Nat}
@@ -208,7 +212,7 @@ def betaSubstGo
       else
         ⟨0, Term.var ⟨varIdx.val, by omega⟩⟩
   | _, ƛ body =>
-      let shiftedArg := renameWeaken (RenameWeaken.succ outerScope) argTerm
+      let shiftedArg := BetaWay1.renameWeaken (BetaWay1.RenameWeaken.succ outerScope) argTerm
       let ⟨substBodyDepth, substBody⟩ := betaSubstGo (targetIndex + 1) shiftedArg (by omega) body
       ⟨substBodyDepth + 1, ƛ substBody⟩
   | _, leftBody ⬝ rightBody =>
@@ -217,14 +221,127 @@ def betaSubstGo
       ⟨max leftDepth rightDepth, leftSubst ⬝ rightSubst⟩
 termination_by _ bodyTerm => bodyTerm.size
 decreasing_by (all_goals (simp [Term.size]; try omega))
------ NO RUN RUNNER PATTERN END
+
+end BetaWay2
+
+-- Non-recursive helper for shiftGo abs case:
+-- casts Term ((n+1)+i) d to Term ((n+i)+1) d (avoids ▸ in recursive body)
+def shiftCast (n i d : Nat) (t : Term ((n + 1) + i) d) : Term ((n + i) + 1) d :=
+  (show (n + 1) + i = (n + i) + 1 from by omega) ▸ t
+
+namespace BetaWay3
+
+-- shift c i: shift all free variables ≥ c upward by i positions
+-- Takes n explicitly for WF recursion; returns Term (n+i) d.
+def shiftGo (c i : Nat) :
+    ∀ (n : Nat) {d : Nat}, Term n d → Term (n + i) d
+  | n, _, Term.var v =>
+    if v.val < c then Term.var ⟨v.val, by omega⟩
+    else Term.var ⟨v.val + i, by omega⟩
+  | n, _, ƛ M =>
+    -- shiftGo (c+1) i (n+1) M : Term ((n+1)+i) d
+    -- shiftCast maps that to Term ((n+i)+1) d so ƛ gives Term (n+i) (d+1)
+    ƛ (shiftCast n i _ (shiftGo (c + 1) i (n + 1) M))
+  | _, _, M ⬝ N =>
+    shiftGo c i _ M ⬝ shiftGo c i _ N
+termination_by n _ t => t.size
+decreasing_by
+  all_goals simp [Term.size]
+  simp +arith only
+  simp +arith only
+
+def shift (c i : Nat) {n d : Nat} (t : Term n d) : Term (n + i) d :=
+  shiftGo c i n t
+
+-- Danelnov-style ↑ notation
+notation:70 "↑" => shift
+
+-- subst k e v: substitute e for variable k in v
+-- Returns sigma-pair since the depth changes
+def substGo {n dN : Nat} (k : Nat) (e : Term n dN) :
+    ∀ {dM : Nat}, Term n dM → (d' : Nat) × Term n d'
+  | _, Term.var i =>
+    if i.val = k then ⟨dN, e⟩ else ⟨0, Term.var i⟩
+  | _, ƛ M =>
+    let ⟨d', M'⟩ := substGo (k + 1) ((↑) 0 1 e) M
+    ⟨d' + 1, ƛ M'⟩
+  | _, M ⬝ N =>
+    let ⟨dM', M'⟩ := substGo k e M
+    let ⟨dN', N'⟩ := substGo k e N
+    ⟨max dM' dN', M' ⬝ N'⟩
+termination_by _ t => t.size
+decreasing_by
+  all_goals simp [Term.size]
+  simp +arith only
+  simp +arith only
+
+def subst {n dM dN : Nat} (v : Term n dM) (k : Nat) (e : Term n dN) : (d' : Nat) × Term n d' :=
+  substGo k e v
+
+notation t "[" k " := " s "]" => subst t k s
+
+-- Non-recursive helper for unshiftGo abs case:
+-- casts Term ((n+i)+1) d to Term ((n+1)+i) d (avoids ▸ in recursive body)
+def unshiftCast (n i d : Nat) (M : Term ((n + i) + 1) d) : Term ((n + 1) + i) d :=
+  (show (n + i) + 1 = (n + 1) + i from by omega) ▸ M
+
+-- unshift c i: inverse of shift. Returns sigma (Term n d') from Term (n+i) d.
+-- All of shift/subst/unshift follow the Danelnov pattern using existentials.
+-- Takes n explicitly for WF recursion.
+def unshiftGo (c i : Nat) :
+    ∀ (n : Nat) {d : Nat}, Term (n + i) d → (d' : Nat) × Term n d'
+  | n, _, Term.var v =>
+    if h : v.val < c then
+      -- Protected var: must land at same index (valid when c ≤ n)
+      if h2 : v.val < n then ⟨0, Term.var ⟨v.val, h2⟩⟩
+      else if h3 : 0 < n then ⟨0, Term.var ⟨0, h3⟩⟩
+      -- n = 0: unreachable in well-typed beta; return dummy closed term
+      else ⟨1, ƛ (Term.var ⟨0, by simp_all only [not_lt, Nat.le_zero_eq, Nat.zero_add, Nat.lt_add_one]⟩)⟩
+    else
+      -- Shifted var: subtract i. When 0 < n: v.val - i < n from v.val < n+i.
+      if h3 : 0 < n then ⟨0, Term.var ⟨v.val - i, by have := v.isLt; omega⟩⟩
+      -- n = 0: unreachable for well-typed beta; return dummy closed term
+      else ⟨1, ƛ (Term.var ⟨0, by simp_all only [not_lt, Nat.le_zero_eq, Nat.zero_add, Nat.lt_add_one]⟩)⟩
+  | n, _, ƛ M =>
+    -- M : Term ((n+i)+1) d. unshiftCast maps to Term ((n+1)+i) d.
+    -- Recursive call reduces scope from (n+1)+i to n+1.
+    let ⟨d', M'⟩ := unshiftGo (c + 1) i (n + 1) (unshiftCast n i _ M)
+    ⟨d' + 1, ƛ M'⟩
+  | _, _, M ⬝ N =>
+    let ⟨dM', M'⟩ := unshiftGo c i _ M
+    let ⟨dN', N'⟩ := unshiftGo c i _ N
+    ⟨max dM' dN', M' ⬝ N'⟩
+termination_by n _ t => t.size
+decreasing_by
+  all_goals simp [Term.size]
+  grind [= size, = unshiftCast]
+  simp +arith only
+  simp +arith only
+
+-- unshiftPair: lift unshiftGo to sigma-pairs
+-- (↓) c i : (Σ d, Term (n+i) d) → (Σ d', Term n d')
+def unshiftPair (c i : Nat) {n : Nat} (p : (d' : Nat) × Term (n + i) d') : (d' : Nat) × Term n d' :=
+  unshiftGo c i n p.2
+
+-- Danelnov-style ↓ notation
+notation:70 "↓" => unshiftPair
+
+def beta {n dM dN : Nat} (M : Term (n + 1) dM) (N : Term n dN) : (d' : Nat) × Term n d' :=
+  (↓) 0 1 (M[0 := (↑) 0 1 N])
+
+end BetaWay3
+
+-- beta reduction: (λ M) N → M[N]
+-- Danelnov structure: shift N up by 1, substitute into M at var 0, unshift result by 1
 
 -- will subst vars with 0 with target term and -1 all others
 def betaSubst {n dM dN : Nat} (M : Term (n + 1) dM) (N : Term n dN) : (d' : Nat) × Term n d' :=
   -- CAN USE THIS INSTEAD
-  -- substContract (mkSubstZero N) M
+  -- substContract (BetaWay1.mkSubstZero N) M
   -- OR THIS
-  betaSubstGo 0 N (by omega) M
+  -- BetaWay2.betaSubstGo 0 N (by omega) M
+  -- OR THIS
+  BetaWay3.beta M N
 
 end Term
 

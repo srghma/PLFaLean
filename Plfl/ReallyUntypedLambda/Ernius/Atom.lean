@@ -1,5 +1,5 @@
 module
-public import Aesop
+
 @[expose] public section
 abbrev Atom := Nat
 
