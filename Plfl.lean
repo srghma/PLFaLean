@@ -50,3 +50,4 @@ public import Plfl.ReallyUntypedLambda.Basic3Typed
 public import Plfl.ReallyUntypedLambda.Basic41Finset
 public import Plfl.ReallyUntypedLambda.Basic42Bitmask
 public import Plfl.ReallyUntypedLambda.Basic43BitVec
+public import Plfl.ReallyUntypedLambda.IwilareNatIsExactScope

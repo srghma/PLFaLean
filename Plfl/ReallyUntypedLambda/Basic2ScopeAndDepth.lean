@@ -63,10 +63,10 @@ def succ : Term 0 3 :=
   )
 
 -- A term with 2 free variables, depth 0:
-def freeTerm : Term 2 0 := ## 0 ⬝ ## 1
+def freeTerm : Term 2 0 := v##0 ⬝ v##1
 
 -- A term with 1 free variable, depth 1 (λy. y ⬝ x0):
-def boundAndFree : Term 1 1 := ƛ (# 0 ⬝ ## 1)
+def boundAndFree : Term 1 1 := ƛ (v# 0 ⬝ v## 1)
 
 namespace BetaWay1
 
@@ -142,7 +142,7 @@ structure SubstWeaken (n m : Nat) where
 
 def SubstWeaken.ext {n m : Nat} (σ : SubstWeaken n m) : SubstWeaken (n + 1) (m + 1) where
   lt  := Nat.succ_lt_succ σ.lt
-  map := Fin.cases ⟨0, # 0⟩ (fun i => let ⟨d, t⟩ := σ.map i; ⟨d, renameWeaken (RenameWeaken.succ m) t⟩)
+  map := Fin.cases ⟨0, v# 0⟩ (fun i => let ⟨d, t⟩ := σ.map i; ⟨d, renameWeaken (RenameWeaken.succ m) t⟩)
 
 def substWeaken {n m : Nat} (σ : SubstWeaken n m) : ∀ {d : Nat}, Term n d → (d' : Nat) × Term m d'
   | _, Term.var i => σ.map i
@@ -154,7 +154,7 @@ structure SubstSame (n : Nat) where
   map : Fin n → (d : Nat) × Term n d
 
 def SubstSame.ext {n : Nat} (σ : SubstSame n) : SubstSame (n + 1) where
-  map := Fin.cases ⟨0, # 0⟩ (fun i => let ⟨d, t⟩ := σ.map i; ⟨d, renameWeaken (RenameWeaken.succ n) t⟩)
+  map := Fin.cases ⟨0, v# 0⟩ (fun i => let ⟨d, t⟩ := σ.map i; ⟨d, renameWeaken (RenameWeaken.succ n) t⟩)
 
 def substSame {n : Nat} (σ : SubstSame n) : ∀ {d : Nat}, Term n d → (d' : Nat) × Term n d'
   | _, Term.var i => σ.map i
@@ -168,7 +168,7 @@ structure SubstContract (n m : Nat) where
 
 def SubstContract.ext {n m : Nat} (σ : SubstContract n m) : SubstContract (n + 1) (m + 1) where
   gt  := Nat.succ_lt_succ σ.gt
-  map := Fin.cases ⟨0, # 0⟩ (fun i => let ⟨d, t⟩ := σ.map i; ⟨d, renameWeaken (RenameWeaken.succ m) t⟩)
+  map := Fin.cases ⟨0, v# 0⟩ (fun i => let ⟨d, t⟩ := σ.map i; ⟨d, renameWeaken (RenameWeaken.succ m) t⟩)
 
 def substContract {n m : Nat} (σ : SubstContract n m) : ∀ {d : Nat}, Term n d → (d' : Nat) × Term m d'
   | _, Term.var i =>
@@ -184,7 +184,7 @@ def substContract {n m : Nat} (σ : SubstContract n m) : ∀ {d : Nat}, Term n d
 -- Substitution of top variable (Fin (n+1) → Σ d, Term n d)
 def mkSubstZero {n dN : Nat} (N : Term n dN) : SubstContract (n + 1) n where
   gt  := Nat.lt_succ_self n
-  map := Fin.cases ⟨dN, N⟩ (fun i => ⟨0, # i⟩)
+  map := Fin.cases ⟨dN, N⟩ (fun i => ⟨0, v# i⟩)
 
 end BetaWay1
 
@@ -367,7 +367,7 @@ notation:65 N₁ " ⇒β " N₂ => Relation.ReflTransGen Beta N₁ N₂
 -- Parallel Beta Reduction (BetaP)
 inductive BetaP : ∀ {n d1 d2 : Nat}, Term n d1 → Term n d2 → Prop where
   | var {n : Nat} (i : Fin n) :
-      BetaP (# i) (# i)
+      BetaP (v# i) (v# i)
   | abs {n d1 d2 : Nat} {M : Term (n + 1) d1} {N : Term (n + 1) d2} :
       BetaP M N → BetaP (ƛ M) (ƛ N)
   | app {n dM dM' dN dN' : Nat} {M : Term n dM} {M' : Term n dM'} {N : Term n dN} {N' : Term n dN'} :

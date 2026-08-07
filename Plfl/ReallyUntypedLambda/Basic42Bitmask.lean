@@ -13,6 +13,7 @@ attribute [-instance] Lean.Grind.Semiring.ofNat
 --   n : Scope size
 --   s : Nat — bitmask of free variables (bit i set ⟺ variable i is free)
 --   d : Abstraction depth
+-- NOTE: lol, bc BitVec is implemented using Nat
 inductive Term : (n : Nat) → Nat → Nat → Type
   | var : ∀ {n : Nat} (i : Fin n), Term n (1 <<< i.val) 0
   | abs : ∀ {n : Nat} {s : Nat} {d : Nat},
