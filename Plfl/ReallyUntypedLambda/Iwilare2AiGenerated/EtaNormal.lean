@@ -7,8 +7,8 @@
 -- forms and the consistency of beta-eta conversion.
 --
 -- The decision procedure `etaRedexBody_or_not` is where `deriving DecidableEq`
--- pays off: in the exact-scope development the structural equality test on
--- terms had to be written and verified by hand.
+-- pays off: the structural equality test on terms is generated, not written
+-- and verified by hand.
 module
 
 public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.BetaEta

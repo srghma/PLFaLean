@@ -28,8 +28,8 @@ theorem IsAbs.abs {n : Nat} (p : Term (n + 1)) : IsAbs (ƛ p) := ⟨p, rfl⟩
 
 /-- Being an abstraction is *decidable*, so a case split on `IsAbs` needs no
     classical reasoning (`by_cases` would silently use `Classical.propDecidable`
-    and hence the axiom of choice).  Here, unlike in the exactly-scoped
-    development, this is an immediate case analysis on the term. -/
+    and hence the axiom of choice); it is an immediate case analysis on the
+    term. -/
 theorem isAbs_or_not {n : Nat} (s : Term n) : IsAbs s ∨ ¬ IsAbs s := by
   cases s with
   | var i => exact Or.inr (by rintro ⟨p, hp⟩; exact absurd hp (by simp))

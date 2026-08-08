@@ -1,11 +1,9 @@
 -- Normal forms, uniqueness of normal forms, and consistency, for the
 -- scope-bounded (`Fin`-indexed) calculus of `FinScope`.
 --
--- This is the port of `IwilareNatIsExactScope/NormalForms.lean` to the new
--- representation.  Every inversion lemma that had to be proved by hand there
--- (`Beta.abs_inv'`, `Beta.app_inv'`, ...) is here just `cases` on the
--- reduction, because `Term n` is an ordinary inductive family: this is one of
--- the simplifications the `Fin`-indexed presentation buys.
+-- Every inversion lemma is here just `cases` on the reduction, because
+-- `Term n` is an ordinary inductive family: this is one of the
+-- simplifications the `Fin`-indexed presentation buys.
 module
 
 public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Basic
@@ -162,12 +160,12 @@ def cfalse {n : Nat} : Term n := ƛ (ƛ (v# 0))
   simp [ctrue]
 @[simp] theorem sub_ctrue {n m : Nat} (σ : Fin n → Term m) : sub σ ctrue = ctrue := by
   simp [ctrue]
-@[simp] theorem betaSubst_ctrue {n : Nat} (N : Term n) : (ctrue : Term (n + 1)) [ N ] = ctrue :=
-  sub_ctrue _
 @[simp] theorem ren_cfalse {n m : Nat} (ρ : Fin n → Fin m) : ren ρ cfalse = cfalse := by
   simp [cfalse]
 @[simp] theorem sub_cfalse {n m : Nat} (σ : Fin n → Term m) : sub σ cfalse = cfalse := by
   simp [cfalse]
+@[simp] theorem betaSubst_ctrue {n : Nat} (N : Term n) : (ctrue : Term (n + 1)) [ N ] = ctrue :=
+  sub_ctrue _
 @[simp] theorem betaSubst_cfalse {n : Nat} (N : Term n) : (cfalse : Term (n + 1)) [ N ] = cfalse :=
   sub_cfalse _
 

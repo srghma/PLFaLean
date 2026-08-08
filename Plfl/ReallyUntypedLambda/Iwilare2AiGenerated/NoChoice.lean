@@ -8,6 +8,12 @@
 -- `by_cases` / `by_contra` / `omega` closing a goal by contradiction) the
 -- command below fails and the build breaks.
 --
+-- The file is deliberately *not* a `module`: inside a `module`, the proofs of
+-- imported declarations are not available to `CollectAxioms`, which then stops
+-- at the first imported lemma and reports nothing, so the check would be
+-- vacuous.  With plain `import`s the whole proof term of every declaration is
+-- traversed.
+--
 -- So: the untyped lambda calculus developed here in its scope-bounded form --
 -- substitution, beta and eta reduction, Church-Rosser, standardization, eta
 -- postponement, normal forms, the evaluators, Church numerals with subtraction,

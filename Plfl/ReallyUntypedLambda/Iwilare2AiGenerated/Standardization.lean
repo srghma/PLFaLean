@@ -15,9 +15,9 @@
 -- The proof is Kashima's: the standard reductions absorb a beta step at the end
 -- (`StdRed.append_beta`), whose crucial case is `StdRed.app_abs`.
 --
--- Compared with the exactly-scoped development, the inversion lemmas for `—→`
--- do not have to be restated here: `Beta.var_inv`, `Beta.abs_inv` and
--- `Beta.app_inv` are already available in the scope-bounded core.
+-- The inversion lemmas for `—→` do not have to be restated here:
+-- `Beta.var_inv`, `Beta.abs_inv` and `Beta.app_inv` are already available in
+-- the scope-bounded core.
 module
 
 public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Postponement

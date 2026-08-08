@@ -1,10 +1,7 @@
 -- Intrinsically *scope-bounded* de Bruijn lambda terms.
 --
--- This is the second implementation in this project.  The first one
--- (`IwilareNatIsExactScope`) indexes a term by the *exact* number of free
--- indexes it uses, which forces substitution to return its scope
--- existentially (a `Σ n, Term n`).  Here the index is instead an *upper bound*
--- on the free indexes, variables being elements of `Fin n`:
+-- A term is indexed by an *upper bound* on its free de Bruijn indexes,
+-- variables being elements of `Fin n`:
 --
 --     inductive Term : Nat → Type
 --       | var : ∀ {n : Nat}, Fin n → Term n
@@ -12,27 +9,30 @@
 --       | app : ∀ {n : Nat}, Term n → Term n → Term n
 --       deriving DecidableEq
 --
--- and the simplification the user predicted really happens:
+-- and the presentation is a very economical one:
 --
---   * `DecidableEq` comes for free from `deriving` (in the exact-scope
---     development it had to be written by hand, because two terms of the same
---     scope can be built from subterms of *different* scopes);
+--   * `DecidableEq` comes for free from `deriving`;
 --   * every operation is scope-directed: renaming is
 --     `(Fin n → Fin m) → Term n → Term m` and substitution is
---     `(Fin n → Term m) → Term n → Term m`, so nothing has to be returned
+--     `(Fin n → Term m) → Term n → Term m`, so no scope has to be returned
 --     existentially and **no Sigma type occurs anywhere** in this development;
+--   * the usual raw `shift` / `unshift` / `subst` triple of the untyped
+--     presentation collapses: shifting is a renaming, unshifting is not an
+--     operation at all but is read off the scopes, and `M [ N ]` is a single
+--     simultaneous substitution.  See the section "Shifting and substituting
+--     at an arbitrary index" below, where the raw definitions are recovered
+--     as `shiftAt` / `substAt` and shown to satisfy the expected laws;
 --   * `betaSubst : Term (n+1) → Term n → Term n` is a one-liner, and beta
 --     reduction is an ordinary relation on `Term n` which is confluent:
 --     `beta_church_rosser` below.
 --
--- The price is that the index is no longer exact: see the section
--- "How exact is the index?" at the end of the file, where the equivalence
+-- The price is that the index is only a bound, not exact: see the section
+-- "How exact is the index?" at the end of the file, where of the equivalence
 --
 --     n = 0 ⟺ closed        n > 0 ⟺ the index n - 1 occurs
 --
--- of the exact-scope development is shown to hold only in the first
--- (⟸ is still fine) and to *fail* in the second: `notExact` is a term of
--- type `Term 1` with no free index at all.
+-- only the first half survives, the second one failing: `notExact` is a term
+-- of type `Term 1` with no free index at all.
 module
 
 public import Aesop
@@ -82,8 +82,12 @@ def sub : {n m : Nat} → (Fin n → Term m) → Term n → Term m
   | _, _, σ, .app a b => .app (sub σ a) (sub σ b)
 
 /-- **Beta substitution**: substitute `N` for the index `0` of `M`, decreasing
-the scope by one.  This is the operation that had to be returned
-existentially in the exact-scope development. -/
+the scope by one.
+
+This is the whole of the raw `↓ 0 1 (M[0 := ↑ 0 1 N])` dance of the untyped
+presentation: the shift of `N` under a binder is performed by `exts`, and the
+unshift is not an operation at all, the substitution `Fin.cons N var` simply
+lands in `Term n`. -/
 def betaSubst {n : Nat} (M : Term (n + 1)) (N : Term n) : Term n :=
   sub (Fin.cons N .var) M
 
@@ -276,13 +280,161 @@ theorem betaSubst_abs {n : Nat} (t : Term (n + 2)) (N : Term n) :
 @[simp] theorem sub_var_eq_ren {n m : Nat} (ρ : Fin n → Fin m) (t : Term n) :
     sub (fun i => v# (ρ i)) t = ren ρ t := (ren_eq_sub ρ t).symm
 
-/-- **Weakening**, which the exact-scope discipline could not provide: a
-`Term n` is a `Term (n+1)` that does not use the index `0`. -/
+/-- **Weakening**: a `Term n` is a `Term (n+1)` that does not use the index
+`0`.  This is the raw `shift 0 1`. -/
 abbrev wk {n : Nat} (t : Term n) : Term (n + 1) := ren Fin.succ t
 
 /-- Substituting for the index `0` of a weakened term does nothing. -/
 @[simp] theorem betaSubst_wk {n : Nat} (M N : Term n) : (wk M) [ N ] = M := by
   simp [betaSubst, sub_ren]
+
+
+/-! ### Shifting and substituting at an arbitrary index
+
+The untyped presentation of de Bruijn substitution uses three raw operations,
+
+    shift c i   : raise every index `≥ c` by `i`
+    unshift c i : lower every index `≥ c` by `i`
+    t[k := s]   : replace the index `k` by `s`
+
+and defines beta as `↓ 0 1 (M[0 := ↑ 0 1 N])`.  In the scope-bounded
+presentation all three are subsumed by `ren` and `sub`, and the `unshift` is
+performed by the *types*: the section below recovers `shift` and `subst` as
+`shiftAt` and `substAt` (for the step `i = 1`, which is the only one the
+calculus ever needs, the general `i` being an iteration of it), proves the
+structural equations the raw definitions use as their defining clauses, and
+identifies `substAt 0` with `betaSubst`. -/
+
+/-- **Shift** by one at cutoff `c`: the raw `↑ c 1`, i.e. `Fin.succAbove c`
+applied to every free index.  Note that the scope grows, which is what makes
+the operation total. -/
+def shiftAt {n : Nat} (c : Fin (n + 1)) (t : Term n) : Term (n + 1) :=
+  ren c.succAbove t
+
+/-- The substitution that sends the index `c` to `N` and lowers every index
+above `c` — the raw `↓ c 1` on the variables that are not substituted. -/
+def insertVar {n : Nat} (c : Fin (n + 1)) (N : Term n) (i : Fin (n + 1)) : Term n :=
+  if h : (i : Nat) < (c : Nat) then v# ⟨i, by omega⟩
+  else if h' : (i : Nat) = (c : Nat) then N
+  else v# ⟨(i : Nat) - 1, by have := i.isLt; omega⟩
+
+/-- **Substitution at the index `c`**: the raw `M[c := N]` followed by the raw
+`↓ c 1`.  The unshift is not a separate operation here: `insertVar c N` sends
+`c` to `N` and every other index to the index it becomes once `c` is gone, so
+the result is a `Term n` on the nose. -/
+def substAt {n : Nat} (c : Fin (n + 1)) (M : Term (n + 1)) (N : Term n) : Term n :=
+  sub (insertVar c N) M
+
+@[inherit_doc] notation:max M " [ " c " := " N " ] " => Term.substAt c M N
+
+/-! The two values of `insertVar`. -/
+
+@[simp] theorem insertVar_same {n : Nat} (c : Fin (n + 1)) (N : Term n) :
+    insertVar c N c = N := by
+  simp [insertVar]
+
+@[simp] theorem insertVar_succAbove {n : Nat} (c : Fin (n + 1)) (N : Term n) (j : Fin n) :
+    insertVar c N (c.succAbove j) = v# j := by
+  rcases lt_or_ge (j : Nat) (c : Nat) with h | h
+  · have hs : ((c.succAbove j : Fin (n + 1)) : Nat) = (j : Nat) := by
+      rw [Fin.succAbove_of_castSucc_lt _ _ (Fin.lt_def.mpr h)]; rfl
+    simp only [insertVar, hs, dif_pos h]
+  · have hs : ((c.succAbove j : Fin (n + 1)) : Nat) = (j : Nat) + 1 := by
+      rw [Fin.succAbove_of_le_castSucc _ _ (Fin.le_def.mpr h)]; rfl
+    have h1 : ¬ ((j : Nat) + 1 < (c : Nat)) := by omega
+    have h2 : ¬ ((j : Nat) + 1 = (c : Nat)) := by omega
+    simp only [insertVar, hs, dif_neg h1, dif_neg h2]
+    simp
+
+@[simp] theorem insertVar_zero {n : Nat} (N : Term n) : insertVar 0 N = Fin.cons N var := by
+  funext i
+  induction i using Fin.cases with
+  | zero => simp
+  | succ j =>
+      have h : (0 : Fin (n + 1)).succAbove j = j.succ := by simp
+      rw [← h, insertVar_succAbove]
+      simp
+
+/-- Under a binder, the index and the substituted term are both shifted. -/
+theorem exts_insertVar {n : Nat} (c : Fin (n + 1)) (N : Term n) :
+    exts (insertVar c N) = insertVar c.succ (wk N) := by
+  funext i
+  induction i using Fin.cases with
+  | zero =>
+      rw [exts_zero]
+      unfold insertVar
+      have : 0 < (c.succ : Nat) := by
+        change 0 < (c : Nat) + 1
+        omega
+      simp
+  | succ j =>
+      rw [exts_succ]
+      unfold insertVar
+      rcases lt_trichotomy (j : Nat) (c : Nat) with h | h | h
+      · -- j < c
+        have h_j : (j : Nat) < (c : Nat) := h
+        simp [h_j]
+      · -- j = c
+        have h_j_eq : (j : Nat) = (c : Nat) := h
+        simp [h_j_eq]
+      · -- j > c
+        have h_j_lt : ¬ ((j : Nat) < (c : Nat)) := by omega
+        have h_j_eq : ¬ ((j : Nat) = (c : Nat)) := by omega
+        simp [h_j_lt, h_j_eq]
+        apply Fin.ext
+        simp
+        omega
+
+/-! The defining clauses of the raw `shift`. -/
+
+@[simp] theorem shiftAt_var {n : Nat} (c : Fin (n + 1)) (i : Fin n) :
+    shiftAt c (v# i) = v# (c.succAbove i) := rfl
+
+@[simp] theorem shiftAt_app {n : Nat} (c : Fin (n + 1)) (a b : Term n) :
+    shiftAt c (a ⬝ b) = shiftAt c a ⬝ shiftAt c b := rfl
+
+@[simp] theorem shiftAt_abs {n : Nat} (c : Fin (n + 1)) (t : Term (n + 1)) :
+    shiftAt c (ƛ t) = ƛ (shiftAt c.succ t) := by
+  simp only [shiftAt, ren_abs, Term.abs.injEq]
+  congr 1
+  funext i
+  induction i using Fin.cases with
+  | zero => simp
+  | succ i => simp [Fin.succ_succAbove_succ]
+
+/-- Shifting at cutoff `0` is weakening: the raw `↑ 0 1`. -/
+@[simp] theorem shiftAt_zero {n : Nat} (t : Term n) : shiftAt 0 t = wk t := by
+  simp [shiftAt]
+
+/-! The defining clauses of the raw `subst`. -/
+
+@[simp] theorem substAt_var_same {n : Nat} (c : Fin (n + 1)) (N : Term n) :
+    (v# c) [ c := N ] = N := by
+  simp [substAt]
+
+@[simp] theorem substAt_var_succAbove {n : Nat} (c : Fin (n + 1)) (i : Fin n) (N : Term n) :
+    (v# (c.succAbove i)) [ c := N ] = v# i := by
+  simp [substAt]
+
+@[simp] theorem substAt_app {n : Nat} (c : Fin (n + 1)) (a b : Term (n + 1)) (N : Term n) :
+    (a ⬝ b) [ c := N ] = a [ c := N ] ⬝ b [ c := N ] := rfl
+
+/-- Going under a binder, the index increases and the argument is shifted:
+this is the raw clause `abs v => abs (v.subst (c + 1) (↑ 0 1 N))`. -/
+@[simp] theorem substAt_abs {n : Nat} (c : Fin (n + 1)) (t : Term (n + 2)) (N : Term n) :
+    (ƛ t) [ c := N ] = ƛ (t [ c.succ := wk N ]) := by
+  simp [substAt, exts_insertVar]
+
+/-- **`betaSubst` is substitution at the index `0`**, i.e. the raw
+`↓ 0 1 (M[0 := ↑ 0 1 N])`. -/
+theorem substAt_zero {n : Nat} (M : Term (n + 1)) (N : Term n) : M [ 0 := N ] = M [ N ] := by
+  simp [substAt, betaSubst]
+
+/-- Unshifting undoes shifting: substituting at the index `c` in a term
+shifted at `c` gives the term back, whatever is substituted. -/
+@[simp] theorem substAt_shiftAt {n : Nat} (c : Fin (n + 1)) (M N : Term n) :
+    (shiftAt c M) [ c := N ] = M := by
+  simp [substAt, shiftAt, sub_ren]
 
 end Term
 
@@ -298,6 +450,37 @@ inductive Beta : {n : Nat} → Term n → Term n → Prop
   | appR {n : Nat} {a b b' : Term n} : Beta b b' → Beta (a ⬝ b) (a ⬝ b')
 
 @[inherit_doc] infix:60 " —→ " => Beta
+
+/-! ### Notation for the beta rules
+
+The two congruence rules for an application leave the *passive* argument
+implicit, which is convenient in proofs but makes the rule unreadable when one
+wants to display it.  `Beta.xiL` and `Beta.xiR` are the same two rules with the
+passive argument in front; being reducible and `match_pattern`, they can be
+used both to build a reduction and to case-split on one. -/
+
+/-- `ξₗ`: reduce the *left* argument of an application, the right one being
+the given `L`. -/
+@[match_pattern] abbrev Beta.xiL {n : Nat} {a a' : Term n} (L : Term n) (h : a —→ a') :
+    a ⬝ L —→ a' ⬝ L := Beta.appL h
+
+/-- `ξᵣ`: reduce the *right* argument of an application, the left one being
+the given `L`. -/
+@[match_pattern] abbrev Beta.xiR {n : Nat} {b b' : Term n} (L : Term n) (h : b —→ b') :
+    L ⬝ b —→ L ⬝ b' := Beta.appR h
+
+@[inherit_doc] infixl:65 " —→-ξₗ " => Beta.xiL
+@[inherit_doc] infixl:65 " —→-ξᵣ " => Beta.xiR
+@[inherit_doc] prefix:65 "—→-ƛ " => Beta.abs
+@[inherit_doc] infixl:65 " —→-β " => Beta.basis
+
+/-- The four rules of `—→`, named by their notations. -/
+theorem beta_step_test {n : Nat} {t₁ t₂ : Term n} (h : t₁ —→ t₂) : True :=
+  match h with
+  | _ —→-ξₗ _ => True.intro
+  | _ —→-ξᵣ _ => True.intro
+  | —→-ƛ _    => True.intro
+  | _ —→-β _  => True.intro
 
 /-- Many steps of beta reduction. -/
 abbrev BetaStar {n : Nat} : Term n → Term n → Prop := Relation.ReflTransGen Beta
@@ -360,6 +543,21 @@ inductive BetaPar : {n : Nat} → Term n → Term n → Prop
       BetaPar M M' → BetaPar N N' → BetaPar ((ƛ M) ⬝ N) (M' [ N' ])
 
 @[inherit_doc] infix:60 " ⇉ " => BetaPar
+
+/-! ### Notation for the parallel rules -/
+
+@[inherit_doc] prefix:65 "⇉-c " => BetaPar.var
+@[inherit_doc] prefix:65 "⇉-ƛ " => BetaPar.abs
+@[inherit_doc] infixl:65 " ⇉-ξ " => BetaPar.app
+@[inherit_doc] infixl:65 " ⇉-β " => BetaPar.beta
+
+/-- The four rules of `⇉`, named by their notations. -/
+theorem betapar_step_test {n : Nat} {t₁ t₂ : Term n} (h : t₁ ⇉ t₂) : True :=
+  match h with
+  | ⇉-c _    => True.intro
+  | ⇉-ƛ _    => True.intro
+  | _ ⇉-ξ _  => True.intro
+  | _ ⇉-β _  => True.intro
 
 abbrev BetaParStar {n : Nat} : Term n → Term n → Prop := Relation.ReflTransGen BetaPar
 
@@ -542,16 +740,16 @@ theorem notExact_no_free_index : ¬ occursFree (0 : Fin 1) notExact := by
 that it is closed, its scope is simply `0`. -/
 def sid : Term 0 := ƛ v# 0
 
-/-- `(ƛ 𝟙) ⬝ 𝟙 —→ 𝟙`. -/
+/-- `(ƛ 𝟙) ⬝ 𝟙 —→ 𝟙`, written with the rule notations. -/
 example : (ƛ (wk sid)) ⬝ sid —→ sid := by
-  simpa using Beta.basis (wk sid) sid
+  simpa using (wk sid) —→-β sid
 
 /-- `(λx. (λy. x) x) 𝟙`. -/
 def sample : Term 0 := (ƛ ((ƛ v# 1) ⬝ v# 0)) ⬝ sid
 
 /-- Contracting the outer redex first: `sample —→ (ƛ 𝟙) ⬝ 𝟙 —→ 𝟙`. -/
 example : sample —→* sid := by
-  refine Relation.ReflTransGen.head (Beta.basis ((ƛ v# 1) ⬝ v# 0) sid) ?_
+  refine Relation.ReflTransGen.head (((ƛ v# 1) ⬝ v# 0) —→-β sid) ?_
   refine Relation.ReflTransGen.single ?_
   simp_all only [Nat.reduceAdd, Fin.isValue, betaSubst_app, betaSubst_var_zero]
   solve_by_elim
@@ -559,9 +757,9 @@ example : sample —→* sid := by
 /-- Contracting the inner redex first: `sample —→ 𝟙 ⬝ 𝟙 —→ 𝟙`. -/
 example : sample —→* sid := by
   refine Relation.ReflTransGen.head
-    (Beta.appL (Beta.abs (Beta.basis (v# 1 : Term 2) (v# 0 : Term 1)))) ?_
+    (sid —→-ξₗ (—→-ƛ ((v# 1 : Term 2) —→-β (v# 0 : Term 1)))) ?_
   refine Relation.ReflTransGen.single ?_
-  simpa [sid] using Beta.basis (v# 0 : Term 1) sid
+  simpa [sid] using (v# 0 : Term 1) —→-β sid
 
 
 end FinScope

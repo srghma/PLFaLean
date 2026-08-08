@@ -122,3 +122,7 @@ public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.ScopeBounds
 public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Standardization
 public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Subtraction
 public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.WeakHead
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Alpha
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Multiway
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Positions
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Strategies

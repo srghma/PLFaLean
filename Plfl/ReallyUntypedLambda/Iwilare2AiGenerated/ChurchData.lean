@@ -125,6 +125,7 @@ theorem csnd_cpair {n : Nat} (x y : Term n) : csnd ⬝ (cpair ⬝ x ⬝ y) —�
 
 /-! ## 3. The test for zero -/
 
+/-- `ƛn. n (ƛx. false) true`. -/
 def ciszero {n : Nat} : Term n := ƛ ((v# 0 ⬝ (ƛ cfalse)) ⬝ ctrue)
 
 @[simp] theorem sub_ciszero {n m : Nat} (σ : Fin n → Term m) : sub σ ciszero = ciszero := by

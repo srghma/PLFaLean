@@ -14,9 +14,9 @@
 -- recursion from lambda-definable data is lambda-definable**
 -- (`crec_represents`).
 --
--- Note that, unlike in the exactly-scoped development, `F` and `Z` need not be
--- closed: renaming and substitution are scope-directed here, so the weakenings
--- introduced by the binders of `crec` cancel automatically.
+-- Note that `F` and `Z` need not be closed: renaming and substitution are
+-- scope-directed here, so the weakenings introduced by the binders of `crec`
+-- cancel automatically.
 module
 
 public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Evaluator

@@ -1,8 +1,7 @@
 -- Free indexes and reduction, for the scope-bounded (`Fin`-indexed) calculus.
 --
--- In the exact-scope development the corresponding file had to prove that
--- reduction never *increases* the scope index.  Here that statement is
--- vacuous, because it is imposed by typing: a `Term n` reduces to a `Term n`,
+-- That reduction never *increases* the scope index is here a vacuous
+-- statement, because it is imposed by typing: a `Term n` reduces to a `Term n`,
 -- so a closed term reduces to a closed term with nothing to prove
 -- (`betastar_closed`, below, is `trivial`).
 --
