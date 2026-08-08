@@ -442,6 +442,8 @@ open Term
 
 /-! ## Beta reduction -/
 
+-- XXX: not deterministic, bc rules are NOT mutually exclusive. But can make deterministic if specialize some strategy. E.g. Call-by-value or call-by-name etc & add predicates like `| «ξ-·₂» : Value v → m —→ m' → v ⬝ m → v ⬝ m'`
+
 /-- One step of beta reduction. -/
 inductive Beta : {n : Nat} → Term n → Term n → Prop
   | basis {n : Nat} (M : Term (n + 1)) (N : Term n) : Beta ((ƛ M) ⬝ N) (M [ N ])
