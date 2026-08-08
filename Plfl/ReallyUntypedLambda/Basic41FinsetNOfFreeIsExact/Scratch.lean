@@ -1,0 +1,10 @@
+module
+import Plfl.ReallyUntypedLambda.Basic41FinsetNOfFreeIsExact.ChurchRosser
+
+open Basic41FinsetNOfFreeIsExact
+
+#print axioms Basic41FinsetNOfFreeIsExact.beta_confluence_S
+#print axioms Basic41FinsetNOfFreeIsExact.beta_confluence
+#print axioms Basic41FinsetNOfFreeIsExact.church_rosser
+#print axioms Basic41FinsetNOfFreeIsExact.standardization
+#print axioms Basic41FinsetNOfFreeIsExact.parS_diamond
