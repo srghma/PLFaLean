@@ -102,3 +102,23 @@ public import Plfl.ReallyUntypedLambda.Basic41FinsetNOfFreeIsExact.ChurchRosser.
 public import Plfl.ReallyUntypedLambda.Basic41FinsetNOfFreeIsExact.ChurchRosser.Standardization
 public import Plfl.ReallyUntypedLambda.Basic41FinsetNOfFreeIsExact.ChurchRosser.TermModel
 public import Plfl.ReallyUntypedLambda.Basic41FinsetNOfFreeIsExact.Scratch
+
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Basic
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.BetaEta
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.ChurchData
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.ChurchNumerals
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Combinators
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Eta
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.EtaNormal
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Evaluator
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.FixedPoint
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Leftmost
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Minimisation
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.NoChoice
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.NormalForms
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Postponement
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.PrimitiveRecursion
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.ScopeBounds
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Standardization
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.Subtraction
+public import Plfl.ReallyUntypedLambda.Iwilare2AiGenerated.WeakHead

@@ -584,6 +584,8 @@ theorem beta_church_rosser {n : Nat} {a b c : Term n}
   rcases betapar_church_rosser hab_par hac_par with ⟨d, hbd, hcd⟩
   exact ⟨d, betapar_star_eq_betastar.mp hbd, betapar_star_eq_betastar.mp hcd⟩
 
+-- ######################################################################################
+
 namespace WhyTakahashiDetourNeeded
 -- Falsity of Single-Step ReflGen Strip Lemma:
 -- Single-step Beta reduction (—→) does NOT satisfy ReflGen strip lemma
