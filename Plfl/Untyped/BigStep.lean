@@ -94,6 +94,17 @@ namespace Notation
   scoped notation:40 γ " ⊢ " m " ⇓ " c:51 => Eval γ m c
 end Notation
 
+-- /-- Call-By-Value Big-Step Evaluation (`γ ⊢ m ⇓_cbv v`) -/
+-- inductive EvalCBV : EnvCBV n → Term n → ValCBV → Prop where
+-- | var : EvalCBV γ (‵ i) (γ i)  -- Variables store already-evaluated values!
+-- | lam : EvalCBV γ (ƛ m) (.clos m γ)
+-- | ap  : EvalCBV γ l (.clos n δ) →
+--         EvalCBV γ m v_arg →            -- Step 1: Force argument `m` to evaluate to `v_arg`
+--         EvalCBV (δ ‚'' v_arg) n v →     -- Step 2: Run body `n` with evaluated argument `v_arg`
+--         EvalCBV γ (l ⬝ m) v
+
+-- scoped notation:40 γ " ⊢ " m " ⇓_cbv " v:51 => EvalCBV γ m v
+
 open Notation
 
 -- https://plfa.github.io/BigStep/#exercise-big-step-eg-practice
