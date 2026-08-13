@@ -9,13 +9,14 @@ public import Plfl.Untyped.Substitution
 
 namespace Confluence
 
+open Untyped
 open Untyped.Notation
 
 -- https://plfa.github.io/Confluence/#parallel-reduction
 /--
 Parallel reduction.
 -/
-inductive PReduce : (Γ ⊢ a) → (Γ ⊢ a) → Prop where
+inductive PReduce : Term k → Term k → Prop where
 | var : PReduce (‵ x) (‵ x)
 | lamβ : PReduce n n' → PReduce v v' → PReduce ((ƛ n) ⬝ v) (n'⟦v'⟧)
 | lamζ : PReduce n n' → PReduce (ƛ n) (ƛ n')
@@ -23,13 +24,13 @@ inductive PReduce : (Γ ⊢ a) → (Γ ⊢ a) → Prop where
 
 namespace PReduce
   @[refl]
-  theorem refl (m : Γ ⊢ a) : PReduce m m := by
+  theorem refl (m : Term k) : PReduce m m := by
     match m with
     | ‵ i => exact .var
     | ƛ n => apply lamζ; apply refl
     | l ⬝ m => apply apξ <;> apply refl
 
-  abbrev Clos {Γ a} := Relation.ReflTransGen (α := Γ ⊢ a) PReduce
+  abbrev Clos {k} := Relation.ReflTransGen (α := Term k) PReduce
 end PReduce
 
 open Relation.ReflTransGen (head_induction_on)
@@ -50,21 +51,21 @@ namespace PReduce.Clos
 end PReduce.Clos
 
 namespace PReduce
-  instance {Γ a} : Std.Refl (@PReduce Γ a) where refl := .refl
+  instance {k} : Std.Refl (@PReduce k) where refl := .refl
 
-  instance : Trans (α := Γ ⊢ a) Clos Clos Clos where trans := .trans
-  instance : Trans (α := Γ ⊢ a) Clos PReduce Clos where trans c r := c.tail r
-  instance : Trans (α := Γ ⊢ a) PReduce PReduce Clos where trans r r' := .tail r r'
-  instance : Trans (α := Γ ⊢ a) PReduce Clos Clos where trans r c := .head r c
+  instance : Trans (α := Term k) Clos Clos Clos where trans := .trans
+  instance : Trans (α := Term k) Clos PReduce Clos where trans c r := c.tail r
+  instance : Trans (α := Term k) PReduce PReduce Clos where trans r r' := .tail r r'
+  instance : Trans (α := Term k) PReduce Clos Clos where trans r c := .head r c
 
   -- https://plfa.github.io/Confluence/#equivalence-between-parallel-reduction-and-reduction
-  theorem fromReduce {Γ a} {m n : Γ ⊢ a} : m —→ n → (m ⇛ n)
+  theorem fromReduce {m n : Term k} : m —→ n → (m ⇛ n)
   | .lamβ => .lamβ (.refl _) (.refl _)
   | .lamζ rn => .lamζ (fromReduce rn)
   | .apξ₁ rl => .apξ (fromReduce rl) (.refl _)
   | .apξ₂ rm => .apξ (.refl _) (fromReduce rm)
 
-  theorem toReduceClos : (m ⇛ n) → (m —↠ n)
+  theorem toReduceClos {m n : Term k} : (m ⇛ n) → (m —↠ n)
   | .var => Untyped.Reduce.Clos.refl
   | .lamβ (n:=n) (n':=n') (v:=v) (v':=v') rn rv =>
     calc (ƛ n) ⬝ v
@@ -78,18 +79,18 @@ namespace PReduce
       _ —↠ l' ⬝ m' := Untyped.Reduce.ap_congr₂ (toReduceClos rm)
 end PReduce
 
-def equivPReduceClosReduceClos : (m ⇛* n) ≃ (m —↠ n) where
+def equivPReduceClosReduceClos (k : Nat) {m n : Term k} : (m ⇛* n) ≃ (m —↠ n) where
   toFun := toFun
   invFun := invFun
   left_inv _ := by simp only
   right_inv _ := by simp only
   where
-    toFun {m n} : (m ⇛* n) → (m —↠ n) := by
+    toFun {m n : Term k} : (m ⇛* n) → (m —↠ n) := by
       intro rs; induction rs using head_induction_on with
       | refl => rfl
       | head r _ => apply r.toReduceClos.trans; trivial
 
-    invFun {m n} : (m —↠ n) → (m ⇛* n) := by
+    invFun {m n : Term k} : (m —↠ n) → (m ⇛* n) := by
       intro rs; induction rs using head_induction_on with
       | refl => rfl
       | head r _ => refine .head (PReduce.fromReduce r) ?_; trivial
@@ -98,26 +99,26 @@ open Untyped.Subst
 open Substitution
 
 -- https://plfa.github.io/Confluence/#substitution-lemma-for-parallel-reduction
-abbrev par_subst (σ : Subst Γ Δ) (σ' : Subst Γ Δ) := ∀ {a} {x : Γ ∋ a}, σ x ⇛ σ' x
+abbrev par_subst (σ : Subst n m) (σ' : Subst n m) := ∀ {x : Fin n}, σ x ⇛ σ' x
 
 section
-  lemma par_rename {ρ : Rename Γ Δ} {m m' : Γ ⊢ a} : (m ⇛ m') → (rename ρ m ⇛ rename ρ m')
+  lemma par_rename {ρ : Rename n m} {m m' : Term n} : (m ⇛ m') → (rename ρ m ⇛ rename ρ m')
   := open PReduce in by intro
   | .var => exact .var
   | .lamζ rn => apply lamζ; apply par_rename; trivial
   | .apξ rl rm => apply apξ <;> (apply par_rename; trivial)
-  | .lamβ rn rv =>
-    rename_i n n' v v'; have rn' := par_rename (ρ := ext ρ) rn; have rv' := par_rename (ρ := ρ) rv
+  | .lamβ (n:=n) (n':=n') (v:=v) (v':=v') rn rv =>
+    have rn' := par_rename (ρ := ext ρ) rn; have rv' := par_rename (ρ := ρ) rv
     have := lamβ rn' rv'; rwa [rename_subst_comm] at this
 
-  theorem par_subst_exts {σ τ : Subst Γ Δ} (s : par_subst σ τ)
-  : ∀ {b}, par_subst (exts (b := b) σ) (exts τ)
+  theorem par_subst_exts {σ τ : Subst n m} (s : par_subst σ τ)
+  : par_subst (exts σ) (exts τ)
   := by
-    intro _ _; intro
-    | .z => exact .var
-    | .s i => exact par_rename s
+    intro x; cases x using Fin.cases with
+    | zero => exact .var
+    | succ i => exact par_rename s
 
-  theorem subst_par {σ τ : Subst Γ Δ} {m m' : Γ ⊢ a}
+  theorem subst_par {σ τ : Subst n m} {m m' : Term n}
   (s : par_subst σ τ) (p : m ⇛ m') : (⟪σ⟫ m ⇛ ⟪τ⟫ m')
   := open PReduce in by
     match p with
@@ -126,12 +127,12 @@ section
     | .lamζ pn => apply_rules [lamζ, subst_par, par_subst_exts]
     | .apξ pl pm => apply_rules [apξ, subst_par]
 
-  variable {n n' : Γ‚ a ⊢ b} {m m': Γ ⊢ a}
+  variable {k : Nat} {n n' : Term (k + 1)} {m m': Term k}
 
   theorem par_subst₁σ (p : m ⇛ m') : par_subst (subst₁σ m) (subst₁σ m') := by
-    intro _ i; cases i with simp only [subst₁σ]
-    | z => exact p
-    | s i => exact .var
+    intro i; cases i using Fin.cases with
+    | zero => exact p
+    | succ i => exact .var
 
   theorem sub_par (pn : n ⇛ n') (pm : m ⇛ m') : n⟦m⟧ ⇛ n'⟦m'⟧ :=
     subst_par (par_subst₁σ pm) pn
@@ -141,7 +142,7 @@ end
 /--
 Many parallel reductions at once.
 -/
-abbrev PReduce.plus : (Γ ⊢ a) → (Γ ⊢ a)
+abbrev PReduce.plus : Term n → Term n
 | ‵ i => ‵ i
 | ƛ n => ƛ (plus n)
 | (ƛ n) ⬝ m => plus n⟦plus m⟧
@@ -151,32 +152,34 @@ namespace Notation
   postfix:max "⁺" => PReduce.plus
 end Notation
 
-theorem par_triangle {m n : Γ ⊢ a} : (m ⇛ n) → (n ⇛ m⁺) := open PReduce in by
+open Notation
+
+theorem par_triangle {m n : Term k} : (m ⇛ n) → (n ⇛ m⁺) := open PReduce in by
   intro p; match p with
   | .var => exact .var
   | .lamβ pn pv => exact subst_par (par_subst₁σ (par_triangle pv)) (par_triangle pn)
   | .lamζ pn => exact lamζ (par_triangle pn)
-  | .apξ pl pm => rename_i l l' m m'; match l with
+  | .apξ (l := l) pl pm => match l with
     | ‵ _ => exact apξ (par_triangle pl) (par_triangle pm)
     | _ ⬝ _ => exact apξ (par_triangle pl) (par_triangle pm)
-    | ƛ _ => match pl with | .lamζ pl => exact lamβ (par_triangle pl) (par_triangle pm)
+    | ƛ _ => match pl with | .lamζ pl' => exact lamβ (par_triangle pl') (par_triangle pm)
 
-theorem par_diamond {m n n' : Γ ⊢ a} (p : m ⇛ n) (p' : m ⇛ n')
-: ∃ (l : Γ ⊢ a), (n ⇛ l) ∧ (n' ⇛ l)
+theorem par_diamond {m n n' : Term k} (p : m ⇛ n) (p' : m ⇛ n')
+: ∃ (l : Term k), (n ⇛ l) ∧ (n' ⇛ l)
 := by
   exists m⁺; constructor <;> (apply par_triangle; trivial)
 
 -- https://plfa.github.io/Confluence/#proof-of-confluence-for-parallel-reduction
-theorem strip {m n n' : Γ ⊢ a} (mn : m ⇛ n) (mn' : m ⇛* n')
-: ∃ (l : Γ ⊢ a), (n ⇛* l) ∧ (n' ⇛ l)
+theorem strip {m n n' : Term k} (mn : m ⇛ n) (mn' : m ⇛* n')
+: ∃ (l : Term k), (n ⇛* l) ∧ (n' ⇛ l)
 := by induction mn' using head_induction_on generalizing n with
 | refl => exists n, .refl
 | head mm' _ r =>
   rename_i m' f; have ⟨l, hl⟩ := r (par_triangle mm')
   exists l; refine ⟨?_, hl.2⟩; exact .trans (par_triangle mn) hl.1
 
-theorem par_confluence {l m m' : Γ ⊢ a} (lm : l ⇛* m) (lm' : l ⇛* m')
-: ∃ (n : Γ ⊢ a), (m ⇛* n) ∧ (m' ⇛* n)
+theorem par_confluence {l m m' : Term k} (lm : l ⇛* m) (lm' : l ⇛* m')
+: ∃ (n : Term k), (m ⇛* n) ∧ (m' ⇛* n)
 := by induction lm using head_induction_on generalizing m' with
 | refl => exists m', lm'
 | head lm₁ _ r =>
@@ -185,9 +188,8 @@ theorem par_confluence {l m m' : Γ ⊢ a} (lm : l ⇛* m) (lm' : l ⇛* m')
   exists n', mn'; exact .trans m'n nn'
 
 -- https://plfa.github.io/Confluence/#proof-of-confluence-for-reduction
-theorem confluence {l m m' : Γ ⊢ a} (lm : l —↠ m) (lm' : l —↠ m')
-: ∃ (n : Γ ⊢ a), (m —↠ n) ∧ (m' —↠ n)
+theorem confluence {l m m' : Term k} (lm : l —↠ m) (lm' : l —↠ m')
+: ∃ (n : Term k), (m —↠ n) ∧ (m' —↠ n)
 := by
-  let equiv := @equivPReduceClosReduceClos Γ a
-  have ⟨n, mn, m'n⟩:= par_confluence (equiv.invFun lm) (equiv.invFun lm')
-  exists n; exact ⟨equiv.toFun mn, equiv.toFun m'n⟩
+  have ⟨n, mn, m'n⟩:= par_confluence ((equivPReduceClosReduceClos k).invFun lm) ((equivPReduceClosReduceClos k).invFun lm')
+  exists n; exact ⟨(equivPReduceClosReduceClos k).toFun mn, (equivPReduceClosReduceClos k).toFun m'n⟩

@@ -34,16 +34,22 @@ end Notation
 
 open Notation
 
+section
+
+set_option hygiene false in
+set_option quotPrecheck false in
+local infix:40 " ⊑ " => Sub
+
 /-- `Sub` adapts the familiar notion of subset to the `Value` type. -/
 inductive Sub : Value → Value → Prop where
-| bot : Sub ⊥ v
-| conjL : Sub v u → Sub w u → Sub (v ⊔ w) u
-| conjR₁ : Sub u v → Sub u (v ⊔ w)
-| conjR₂ : Sub u w → Sub u (v ⊔ w)
-| trans : Sub u v → Sub v w → Sub u w
-| fn : Sub v' v → Sub w w' → Sub (v ⇾ w) (v' ⇾ w')
-| dist : Sub (v ⇾ (w ⊔ w')) ((v ⇾ w) ⊔ (v ⇾ w'))
-
+| bot : ⊥ ⊑ v
+| conjL : v ⊑ u → w ⊑ u → (v ⊔ w) ⊑ u
+| conjR₁ : u ⊑ v → u ⊑ (v ⊔ w)
+| conjR₂ : u ⊑ w → u ⊑ (v ⊔ w)
+| trans : u ⊑ v → v ⊑ w → u ⊑ w
+| fn : v' ⊑ v → w ⊑ w' → (v ⇾ w) ⊑ (v' ⇾ w')
+| dist : (v ⇾ (w ⊔ w')) ⊑ ((v ⇾ w) ⊔ (v ⇾ w'))
+end section
 namespace Notation
   scoped infix:40 " ⊑ " => Sub
 end Notation
@@ -86,70 +92,71 @@ theorem conj_sub₂ (h : u ⊔ v ⊑ w) : v ⊑ w := by
   | conjR₂ h ih => exact .conjR₂ (ih rfl)
   | trans h h' ih => exact .trans (ih rfl) h'
 
-open Untyped (Context)
+open Untyped
 open Untyped.Notation
 
 -- https://plfa.github.io/Denotational/#environments
 /--
 An `Env` gives meaning to a term's free vars by mapping vars to values.
 -/
-abbrev Env (Γ : Context) : Type := ∀ (_ : Γ ∋ ✶), Value
+abbrev Env (n : Nat) : Type := Fin n → Value
 
 namespace Env
-  instance : EmptyCollection (Env ∅) where emptyCollection := nofun
+  def empty : Env 0 := nofun
+  instance : EmptyCollection (Env 0) where emptyCollection := empty
 
-  abbrev snoc (γ : Env Γ) (v : Value) : Env (Γ‚ ✶)
-  | .z => v
-  | .s i => γ i
+  abbrev snoc (γ : Env n) (v : Value) : Env (n + 1) := Fin.cases v γ
 end Env
 
 namespace Notation
-  scoped notation "`∅" => (∅ : Env ∅)
+  scoped notation "`∅" => Env.empty
 
   -- `‚` is not a comma! See: <https://www.compart.com/en/unicode/U+201A>
   scoped infixl:50 "`‚ " => Env.snoc
 end Notation
 
-namespace Env
-  -- * I could have used Lisp jargons `cdr` and `car` here,
-  -- * instead of the Haskell ones below...
-  abbrev init (γ : Env (Γ‚ ✶)) : Env Γ := (γ ·.s)
-  abbrev last (γ : Env (Γ‚ ✶)) : Value := γ .z
+open Notation
 
-  theorem init_last (γ : Env (Γ‚ ✶)) : γ = (γ.init`‚ γ.last) := by
-    ext x; cases x <;> rfl
+namespace Env
+  abbrev init (γ : Env (n + 1)) : Env n := γ ∘ Fin.succ
+  abbrev last (γ : Env (n + 1)) : Value := γ 0
+
+  theorem init_last (γ : Env (n + 1)) : γ = (γ.init`‚ γ.last) := by
+    ext x; cases x using Fin.cases <;> rfl
 
   /-- We extend the `⊑` relation point-wise to `Env`s. -/
-  def Sub (γ δ : Env Γ) : Prop := ∀ (x : Γ ∋ ✶), γ x ⊑ δ x
-  abbrev conj (γ δ : Env Γ) : Env Γ | x => γ x ⊔ δ x
+  def Sub (γ δ : Env n) : Prop := ∀ (x : Fin n), γ x ⊑ δ x
+  abbrev conj (γ δ : Env n) : Env n | x => γ x ⊔ δ x
 end Env
 
 namespace Notation
-  instance : Bot (Env Γ) where bot _ := ⊥
-  instance : Max (Env Γ) where max := Env.conj
+  instance : Bot (Env n) where bot _ := ⊥
+  instance : Max (Env n) where max := Env.conj
 
   scoped infix:40 " `⊑ " => Env.Sub
 end Notation
 
 namespace Env.Sub
   @[refl] theorem refl : γ `⊑ γ | _ => .refl
-  @[simp] theorem conjR₁ (γ δ : Env Γ) : γ `⊑ (γ ⊔ δ) | _ => .conjR₁ .refl
-  @[simp] theorem conjR₂ (γ δ : Env Γ) : δ `⊑ (γ ⊔ δ) | _ => .conjR₂ .refl
+  @[simp] theorem conjR₁ (γ δ : Env n) : γ `⊑ (γ ⊔ δ) | _ => .conjR₁ .refl
+  @[simp] theorem conjR₂ (γ δ : Env n) : δ `⊑ (γ ⊔ δ) | _ => .conjR₂ .refl
 
-  theorem ext_le (lt : v ⊑ v') : (γ`‚ v) `⊑ (γ`‚ v')
-  | .z => lt
-  | .s _ => .refl
+  theorem ext_le (lt : v ⊑ v') : (γ`‚ v) `⊑ (γ`‚ v') := by
+    intro i; cases i using Fin.cases with
+    | zero => exact lt
+    | succ i => exact .refl
 
-  theorem le_ext (lt : γ `⊑ γ') : (γ`‚ v) `⊑ (γ'`‚ v)
-  | .z => .refl
-  | .s _ => by apply lt
+  theorem le_ext (lt : γ `⊑ γ') : (γ`‚ v) `⊑ (γ'`‚ v) := by
+    intro i; cases i using Fin.cases with
+    | zero => exact .refl
+    | succ i => exact lt i
 end Env.Sub
 
 -- https://plfa.github.io/Denotational/#denotational-semantics
 /--
 `Eval γ m v` means that evaluating the term `m` in the environment `γ` gives `v`.
 -/
-inductive Eval : Env Γ → (Γ ⊢ ✶) → Value → Prop where
+inductive Eval : Env n → Term n → Value → Prop where
 | var : Eval γ (‵ i) (γ i)
 | ap : Eval γ l (v ⇾ w) → Eval γ m v → Eval γ (l ⬝ m) w
 | fn {v w} : Eval (γ`‚ v) n w → Eval γ (ƛ n) (v ⇾ w)
@@ -160,6 +167,8 @@ inductive Eval : Env Γ → (Γ ⊢ ✶) → Value → Prop where
 namespace Notation
   scoped notation:30 γ " ⊢ " m " ￬ " v:51 => Eval γ m v
 end Notation
+
+open Notation
 
 /--
 Relaxation of table lookup in application,
@@ -223,12 +232,12 @@ end Example
 A denotational semantics can be seen as a function from a term
 to some relation between `Env`s and `Value`s.
 -/
-abbrev Denot (Γ : Context) : Type := Env Γ → Value → Prop
+abbrev Denot (n : Nat) : Type := Env n → Value → Prop
 
 /--
 `ℰ m` is the instance of `Denot` that corresponds to the `Eval` of `m`.
 -/
-abbrev ℰ : (Γ ⊢ ✶) → Denot Γ | m, γ, v => γ ⊢ m ￬ v
+abbrev ℰ : Term n → Denot n := fun m γ v => γ ⊢ m ￬ v
 
 -- Denotational Equality
 
@@ -242,38 +251,40 @@ section
   open Eval
 
   -- https://plfa.github.io/Denotational/#renaming-preserves-denotations
-  variable {γ : Env Γ} {δ : Env Δ}
+  variable {γ : Env n} {δ : Env m}
 
-  theorem ext_sub (ρ : Rename Γ Δ) (lt : γ `⊑ δ ∘ ρ)
-  : (γ`‚ v) `⊑ (δ`‚ v) ∘ ext ρ
-  | .z => .refl
-  | .s i => lt i
+  theorem ext_sub (ρ : Rename n m) (lt : γ `⊑ δ ∘ ρ)
+  : (γ`‚ v) `⊑ (δ`‚ v) ∘ ext ρ := by
+    intro i; cases i using Fin.cases with
+    | zero => exact .refl
+    | succ i => exact lt i
 
-  theorem ext_sub' (ρ : Rename Γ Δ) (lt : δ ∘ ρ `⊑ γ)
-  : (δ`‚ v) ∘ ext ρ `⊑ (γ`‚ v)
-  | .z => .refl
-  | .s i => lt i
+  theorem ext_sub' (ρ : Rename n m) (lt : δ ∘ ρ `⊑ γ)
+  : (δ`‚ v) ∘ ext ρ `⊑ (γ`‚ v) := by
+    intro i; cases i using Fin.cases with
+    | zero => exact .refl
+    | succ i => exact lt i
 
   /-- The result of evaluation is conserved after renaming. -/
-  theorem rename_pres (ρ : Rename Γ Δ) (lt : γ `⊑ δ ∘ ρ) (d : γ ⊢ m ￬ v)
-  : δ ⊢ rename ρ m ￬ v
-  := by induction d generalizing Δ with
+  theorem rename_pres (ρ : Rename n m) (lt : γ `⊑ δ ∘ ρ) (d : γ ⊢ t ￬ v)
+  : δ ⊢ rename ρ t ￬ v
+  := by induction d generalizing m with
   | var => apply sub .var; apply lt
   | ap _ _ r r' => exact .ap (r ρ lt) (r' ρ lt)
-  | fn _ r => apply fn; rename_i v _ _ _; exact r (ext ρ) (ext_sub ρ lt)
+  | fn _ r => apply fn; exact r (ext ρ) (ext_sub ρ lt)
   | bot => exact .bot
   | conj _ _ r r' => exact .conj (r ρ lt) (r' ρ lt)
   | sub _ lt' r => exact (r ρ lt).sub lt'
 
   -- https://plfa.github.io/Denotational/#environment-strengthening-and-identity-renaming
 
-  variable {γ δ : Env Γ}
+  variable {γ δ : Env n}
 
   /-- The result of evaluation is conserved under a superset. -/
-  theorem sub_env (d : γ ⊢ m ￬ v) (lt : γ `⊑ δ) : δ ⊢ m ￬ v := by
+  theorem sub_env (d : γ ⊢ t ￬ v) (lt : γ `⊑ δ) : δ ⊢ t ￬ v := by
     convert rename_pres id lt d; exact rename_id.symm
 
-  lemma up_env (d : (γ`‚ u) ⊢ m ￬ v) (lt : u ⊑ u') : (γ`‚ u') ⊢ m ￬ v := by
+  lemma up_env (d : (γ`‚ u) ⊢ t ￬ v) (lt : u ⊑ u') : (γ`‚ u') ⊢ t ￬ v := by
     apply sub_env d; exact Env.Sub.ext_le lt
 end
 
@@ -307,17 +318,15 @@ section
     | zero => exact var
     | succ n r =>
       unfold church.applyN; apply ap
-      · apply sub var; simp only [Env.snoc, Value.path]; convert Sub.refl.conjR₂
+      · apply sub var; simp only [Env.snoc, Value.path]; exact .conjR₂ .refl
       · convert sub_env (@r vs.pop) ?_ using 1
-        · simp_all only [List.empty_eq, Vector.getElem_pop']
-        · intro x; cases x with
-          | z =>
-            simp_all only [List.empty_eq, Vector.getElem_pop']
-            rfl
-          | s i =>
-            cases i with
-            | z => exact .conjR₁ .refl
-            | s i' => cases i'
+        · simp_all only [Vector.getElem_pop']
+        · intro x; cases x using Fin.cases with
+          | zero => simp_all only [Vector.getElem_pop']; exact Sub.refl
+          | succ i =>
+            cases i using Fin.cases with
+            | zero => exact .conjR₁ .refl
+            | succ i' => exact Fin.elim0 i'
 end
 
 -- https://plfa.github.io/Denotational/#inversion-of-the-less-than-relation-for-functions
@@ -421,7 +430,7 @@ theorem conjCodom_included (s : u ⊆ v ⇾ w) : u.conjCodom ⊆ w := by inducti
   exact Or.elim h (ih s.fst) (ih' s.snd)
 
 /--
-We say that `v ⇾ w` factors `u` into `u`, if:
+We say that `v ⇾ w` factors `u` into `u'`, if:
 - `u'` contains only functions;
 - `u` is included in `u`;
 - `u'`'s domain is less than `v`;

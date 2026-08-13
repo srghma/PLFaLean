@@ -9,11 +9,12 @@ public import Mathlib.Order.BooleanAlgebra.Defs
 
 namespace Compositional
 
+open Untyped
 open Untyped.Notation
 open Denotational Denotational.Notation
 
 -- https://plfa.github.io/Compositional/#equation-for-lambda-abstraction
-def ℱ (d : Denot (Γ‚ ✶)) : Denot Γ
+def ℱ (d : Denot (n + 1)) : Denot n
 | _, ⊥ => ⊤
 | γ, v ⇾ w => d (γ`‚ v) w
 | γ, .conj u v => ℱ d γ u ∧ ℱ d γ v
@@ -45,7 +46,7 @@ lemma ℰ_lam (d : ℱ (ℰ n) γ v) : ℰ (ƛ n) γ v := match v with
 theorem lam_equiv : ℰ (ƛ n) = ℱ (ℰ n) := by ext; exact ⟨ℱ_ℰ, ℰ_lam⟩
 
 -- https://plfa.github.io/Compositional/#equation-for-function-application
-abbrev 𝒜 (d d' : Denot Γ) : Denot Γ | γ, w => (w ⊑ ⊥) ∨ (∃ v, d γ (v ⇾ w) ∧ d' γ v)
+abbrev 𝒜 (d d' : Denot n) : Denot n | γ, w => (w ⊑ ⊥) ∨ (∃ v, d γ (v ⇾ w) ∧ d' γ v)
 
 namespace Notation
   scoped infixl:70 " ● " => 𝒜
@@ -79,7 +80,7 @@ lemma ℰ_ap : (ℰ l ● ℰ m) γ v → ℰ (l ⬝ m) γ v
 
 theorem ap_equiv : ℰ (l ⬝ m) = (ℰ l ● ℰ m) := by ext; exact ⟨𝒜_ℰ, ℰ_ap⟩
 
-abbrev 𝒱 (i : Γ ∋ ✶) (γ : Env Γ) (v : Value) : Prop := v ⊑ γ i
+abbrev 𝒱 (i : Fin n) (γ : Env n) (v : Value) : Prop := v ⊑ γ i
 
 theorem var_inv (d : ℰ (‵ i) γ v) : 𝒱 i γ v := by
   generalize hx : (‵ i) = x at *
@@ -103,25 +104,24 @@ lemma ap_congr (hl : ℰ l = ℰ l') (hm : ℰ m = ℰ m') : ℰ (l ⬝ m) = ℰ
   _ = ℰ (l' ⬝ m') := ap_equiv.symm
 
 -- https://plfa.github.io/Compositional/#compositionality
-open Untyped (Context)
 
 /--
-`Holed Γ Δ` describes a program with a hole in it:
-- `Γ` is the `Context` for the hole.
-- `Δ` is the `Context` for the terms that result from filling the hole.
+`Holed n m` describes a program with a hole in it:
+- `n` is the Nat context bound for the hole.
+- `m` is the Nat context bound for the terms that result from filling the hole.
 -/
-inductive Holed : Context → Context → Type where
+inductive Holed : Nat → Nat → Type where
 /-- A basic hole. -/
-| hole : Holed Γ Γ
+| hole : Holed n n
 /-- λ-abstracting the hole makes a bigger hole. -/
-| lam : Holed (Γ‚ ✶) (Δ‚ ✶) → Holed (Γ‚ ✶) Δ
+| lam : Holed (n + 1) (m + 1) → Holed (n + 1) m
 /-- Applying to a holed function makes a bigger hole. -/
-| apL : Holed Γ Δ → (Δ ⊢ ✶) → Holed Γ Δ
+| apL : Holed n m → Term m → Holed n m
 /-- Applying a holed argument makes a bigger hole. -/
-| apR : (Δ ⊢ ✶) → Holed Γ Δ → Holed Γ Δ
+| apR : Term m → Holed n m → Holed n m
 
 /-- `plug`s a term into a `Holed` context, making a new term. -/
-def Holed.plug : Holed Γ Δ → (Γ ⊢ ✶) → (Δ ⊢ ✶)
+def Holed.plug : Holed n m → Term n → Term m
 | .hole, m => m
 | .lam c, n => ƛ c.plug n
 | .apL c n, l => c.plug l ⬝ n
@@ -132,8 +132,8 @@ Given two terms that are denotationally equal,
 plugging them both into any holed context produces two programs
 that are denotationally equal.
 -/
-theorem compositionality {c : Holed Γ Δ} (h : ℰ m = ℰ n) : ℰ (c.plug m) = ℰ (c.plug n) := by
-  induction c with unfold Holed.plug
+theorem compositionality {c : Holed n m} (h : ℰ m' = ℰ n') : ℰ (c.plug m') = ℰ (c.plug n') := by
+  induction c with
   | hole => exact h
   | lam _ ih => exact lam_congr (ih h)
   | apL _ _ ih => exact ap_congr (ih h) (by rfl)
@@ -144,16 +144,16 @@ theorem compositionality {c : Holed Γ Δ} (h : ℰ m = ℰ n) : ℰ (c.plug m) 
 `ℰ₀ m` is the instance of `Denot` that corresponds to the `Eval` of `m`.
 It is like `ℰ m`, but defined computationally.
 -/
-def ℰ₀ : (Γ ⊢ ✶) → Denot Γ
+def ℰ₀ : Term n → Denot n
 | ‵ i => 𝒱 i
 | ƛ n => ℱ (ℰ₀ n)
 | l ⬝ m => ℰ₀ l ● ℰ₀ m
 
 /-- The two definitions of `ℰ` are equivalent. -/
-theorem ℰ_eq_ℰ₀ : ℰ (Γ := Γ) = ℰ₀ := by ext; rw [impl]
+theorem ℰ_eq_ℰ₀ : ℰ (n := n) = ℰ₀ := by ext; rw [impl]
   where
-    impl {a} {m : Γ ⊢ a} : ℰ m = ℰ₀ m := by
+    impl {n : Nat} {m : Term n} : ℰ m = ℰ₀ m := by
       induction m with (ext γ v; simp only [ℰ₀])
       | var i => rw [var_equiv]
-      | lam n ih => rw [←ih, lam_equiv]
-      | ap l m ih ih' => rw [←ih, ←ih', ap_equiv]
+      | abs n ih => rw [←ih, lam_equiv]
+      | app l m ih ih' => rw [←ih, ←ih', ap_equiv]

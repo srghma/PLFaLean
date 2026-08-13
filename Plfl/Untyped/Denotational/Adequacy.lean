@@ -64,6 +64,10 @@ instance GtFn.dec {v} : Decidable (GtFn v) := by match v with
     | isTrue h' => right; have ⟨v, w, lt⟩ := h'; exists v, w; exact lt.conjR₂
     | isFalse h' => left; exact not_gtFn_conj h h'
 
+-- /-- Helper for `𝔼` parameterized by the property `𝕍_v` for `v`. -/
+-- def 𝔼_with (𝕍_v : Clos → Prop) (v : Value) : Clos → Prop
+--   | .clos m γ' => GtFn v → ∃ c, (γ' ⊢ m ⇓ c) ∧ 𝕍_v c
+
 -- https://plfa.github.io/Adequacy/#relating-values-to-closures
 mutual
   /--
@@ -72,18 +76,16 @@ mutual
   - `v` is a function;
   - `c`'s body evaluates according to `v`.
   -/
+  @[simp, grind =]
   def 𝕍 : Value → Clos → Prop
   | _, .clos (‵ _) _ => ⊥
   | _, .clos (_ ⬝ _) _ => ⊥
   | ⊥, .clos (ƛ _) _ => ⊤
+  -- | v ⇾ w, .clos (ƛ n) γ => ∀ {c}, 𝔼_with (𝕍 v) v c → GtFn w → ∃ c', (γ‚' c ⊢ n ⇓ c') ∧ 𝕍 w c'
   | vw@(v ⇾ w), .clos (ƛ n) γ =>
-    have : sizeOf w < sizeOf vw := by subst_vars; simp only [Value.fn.sizeOf_spec,
-      lt_add_iff_pos_left, add_pos_iff, Order.lt_one_iff, true_or]
+    have : sizeOf w < sizeOf vw := by subst_vars; simp only [Value.fn.sizeOf_spec,  lt_add_iff_pos_left, add_pos_iff, Order.lt_one_iff, true_or]
     ∀ {c}, 𝔼 v c → GtFn w → ∃ c', (γ‚' c ⊢ n ⇓ c') ∧ 𝕍 w c'
-  | uv@(.conj u v), c@(.clos (ƛ _) _) =>
-    have : sizeOf v < sizeOf uv := by subst_vars; simp only [Value.conj.sizeOf_spec,
-      lt_add_iff_pos_left, add_pos_iff, Order.lt_one_iff, true_or]
-    𝕍 u c ∧ 𝕍 v c
+  | .conj u v, c@(.clos (ƛ _) _) => 𝕍 u c ∧ 𝕍 v c
 
   /--
   `𝔼 v c` will hold when:
@@ -91,28 +93,104 @@ mutual
   - `c` evaluates to a closure `c'` in WHNF;
   - `𝕍 v c` holds.
   -/
+  @[simp, grind =]
   def 𝔼 (v : Value) : Clos → Prop | .clos m γ' => GtFn v → ∃ c, (γ' ⊢ m ⇓ c) ∧ 𝕍 v c
 end
 
+-- Example 𝕍 #1: Identity function closure satisfies ⊥
+theorem example_𝕍_1 : 𝕍 ⊥ (.clos (ƛ #0) ClosEnv.empty) := by
+  unfold 𝕍
+  trivial
+
+-- Example 𝕍 #2: Identity function closure satisfies (⊥ ⇾ ⊥)
+theorem example_𝕍_2 : 𝕍 (⊥ ⇾ ⊥) (.clos (ƛ #0) ClosEnv.empty) := by
+  unfold 𝕍
+  intro _proof _c_arg _h_ev h_gt
+  exfalso
+  exact not_gtFn_bot h_gt
+
+-- Example 𝕍 #3: Variable closures definitionally fail 𝕍
+theorem example_𝕍_var (v : Value) (γ : ClosEnv (n + 1)) :
+    ¬ 𝕍 v (.clos (‵ 0) γ) := by
+  intro h
+  unfold 𝕍 at h
+  exact h
+
+-- Example 𝕍 #4: Application closures definitionally fail 𝕍
+theorem example_𝕍_app (v : Value) (l m : Term n) (γ : ClosEnv n) :
+    ¬ 𝕍 v (.clos (l ⬝ m) γ) := by
+  intro h
+  unfold 𝕍 at h
+  exact h
+
+section
+  -- Identity closure
+  def c_id : Clos := .clos Term.id ClosEnv.empty
+
+  -- Environment γ1 of size 1: maps #0 ↦ c_id
+  def γ1 : ClosEnv 1 := ClosEnv.empty ‚' c_id
+
+  -- Example 𝔼 #3: Variable #0 evaluated in non-empty environment γ1
+  theorem example_𝔼_var : 𝔼 (⊥ ⇾ ⊥) (.clos (‵ 0) γ1) := by
+    unfold 𝔼
+    intro _h_gt
+    -- Witness: Evaluates to .clos (ƛ #0) ClosEnv.empty
+    refine ⟨.clos (ƛ #0) ClosEnv.empty, ?_eval, example_𝕍_2⟩
+    -- Big-step evaluation: looks up γ1(0) = c_id, then evaluates Term.id
+    exact BigStep.Eval.var rfl BigStep.Eval.lam
+
+  -- Generalized Example 𝕍: Identity closure in ANY environment γ satisfies (⊥ ⇾ ⊥)
+  theorem example_𝕍_any_env (γ : ClosEnv n) : 𝕍 (⊥ ⇾ ⊥) (.clos (ƛ #0) γ) := by
+    unfold 𝕍
+    intro _proof _c_arg _h_ev h_gt
+    exfalso
+    exact not_gtFn_bot h_gt
+
+  -- Example 𝔼 #4: Application (id ⬝ id) in non-empty environment γ1
+  theorem example_𝔼_app_nonempty : 𝔼 (⊥ ⇾ ⊥) (.clos (Term.id ⬝ Term.id) γ1) := by
+    unfold 𝔼
+    intro _h_gt
+    -- Witness: Evaluates to .clos (ƛ #0) γ1
+    refine ⟨.clos (ƛ #0) γ1, ?_eval, example_𝕍_any_env γ1⟩
+    -- Big-step evaluation of application in γ1:
+    apply BigStep.Eval.ap
+    · exact BigStep.Eval.lam                     -- Eval function Term.id in γ1
+    · exact BigStep.Eval.var rfl BigStep.Eval.lam -- Eval body #0 in extended env (γ1 ‚' c_id)
+end section
+
+-- Example 𝔼 #1: Divergent term Ω satisfies ⊥
+theorem example_𝔼_1 : 𝔼 ⊥ (.clos Term.omega ClosEnv.empty) := by
+  unfold 𝔼
+  intro gt
+  exfalso
+  exact not_gtFn_bot gt
+
+-- Example 𝔼 #2: Term `id` evaluates and satisfies (⊥ ⇾ ⊥)
+theorem example_𝔼_2 : 𝔼 (⊥ ⇾ ⊥) (.clos Term.id ClosEnv.empty) := by
+  unfold 𝔼
+  intro _
+  refine ⟨.clos (ƛ #0) ClosEnv.empty, BigStep.Eval.lam, example_𝕍_2⟩
+
 /-- `𝔾` relates `γ` to `γ'` if the corresponding values and closures are related by `𝔼` -/
-def 𝔾 (γ : Env Γ) (γ' : ClosEnv Γ) : Prop := ∀ {i : Γ ∋ ✶}, 𝔼 (γ i) (γ' i)
+def 𝔾 (γ : Env n) (γ' : ClosEnv n) : Prop := ∀ {i : Fin n}, 𝔼 (γ i) (γ' i)
 
-theorem 𝔾.empty : 𝔾 `∅ ∅ := nofun
+theorem 𝔾.empty : 𝔾 `∅ ∅ := by intro i; exact Fin.elim0 i
 
-theorem 𝔾.ext (g : 𝔾 γ γ') (e : 𝔼 v c) : 𝔾 (γ`‚ v) (γ'‚' c) := by unfold 𝔾; intro
-| .z => exact e
-| .s _ => exact g
+theorem 𝔾.ext (g : 𝔾 γ γ') (e : 𝔼 v c) : 𝔾 (γ`‚ v) (γ'‚' c) := by
+  unfold 𝔾; intro i; cases i using Fin.cases with
+  | zero => exact e
+  | succ _ => exact g
 
 /-- The proof of a term being in Weak-Head Normal Form. -/
-def WHNF (t : Γ ⊢ a) : Prop := ∃ n : Γ‚ ✶ ⊢ ✶, t = (ƛ n)
+def WHNF (t : Term n) : Prop := ∃ n' : Term (n + 1), t = (ƛ n')
 
 /-- A closure in a 𝕍 relation must be in WHNF. -/
 lemma WHNF.of_𝕍 (vc : 𝕍 v (.clos m γ)) : WHNF m := by
-  cases m with (try simp only [𝕍, «Prop».bot_eq_false] at vc; try contradiction) | lam n => exists n
+  cases m with (try simp only [𝕍, «Prop».bot_eq_false] at vc; try contradiction) | abs n => exists n
 
 lemma 𝕍.conj (uc : 𝕍 u c) (vc : 𝕍 v c) : 𝕍 (u ⊔ v) c := by
   let .clos m γ := c; cases m with (try simp only [𝕍, «Prop».bot_eq_false] at *; try contradiction)
-  | lam => unfold 𝕍; exact ⟨uc, vc⟩
+  | abs => unfold 𝕍; exact ⟨uc, vc⟩
 
 lemma 𝕍.of_not_gtFn (nf : ¬ GtFn v) : 𝕍 v (.clos (ƛ n) γ') := by induction v with unfold 𝕍
 | bot => trivial
@@ -120,10 +198,10 @@ lemma 𝕍.of_not_gtFn (nf : ¬ GtFn v) : 𝕍 v (.clos (ƛ n) γ') := by induct
 | conj _ _ ih ih' => exact not_gtFn_conj_inv nf |>.imp ih ih'
 
 lemma 𝕍.sub {v v'} (vvc : 𝕍 v c) (lt : v' ⊑ v) : 𝕍 v' c := by
-  let .clos m γ := c; cases m with (try simp only [𝕍, «Prop».bot_eq_false] at *; try contradiction) | lam m =>
-    rename_i Γ; induction lt generalizing Γ with
+  let .clos m γ := c; cases m with (try simp only [𝕍, «Prop».bot_eq_false] at *; try contradiction) | abs m =>
+    rename_i n; induction lt generalizing n with
     | bot => unfold 𝕍; trivial
-    | conjL _ _ ih ih' => unfold 𝕍; exact ⟨ih _ _ _ vvc, ih' _ _ _ vvc⟩
+    | conjL _ _ ih ih' => unfold 𝕍; exact ⟨@ih _ _ _ vvc, @ih' _ _ _ vvc⟩
     | conjR₁ _ ih => apply ih; unfold 𝕍 at vvc; exact vvc.1
     | conjR₂ _ ih => apply ih; unfold 𝕍 at vvc; exact vvc.2
     | trans _ _ ih ih' => apply_rules [ih, ih']
@@ -133,9 +211,9 @@ lemma 𝕍.sub {v v'} (vvc : 𝕍 v c) (lt : v' ⊑ v) : 𝕍 v' c := by
         -- HACK: Broken mutual induction with `𝔼.sub` here.
         cases c; simp only [𝔼] at *; intro gtv'
         have ⟨c, ec, vv₁c⟩ := evc <| gtv'.sub lt; exists c, ec
-        cases c with | clos m γ => have ⟨m', h'⟩ := WHNF.of_𝕍 vv₁c; subst h'; exact ih _ γ _ vv₁c
+        cases c with | clos m γ => have ⟨m', h'⟩ := WHNF.of_𝕍 vv₁c; subst h'; exact @ih _ _ _ vv₁c
       have ⟨c', ec', vw₂c'⟩ := vvc this (gtw.sub lt'); exists c', ec'
-      let .clos _ _ := c'; have ⟨m', h'⟩ := WHNF.of_𝕍 vw₂c'; subst h'; exact ih' _ _ _ vw₂c'
+      let .clos _ _ := c'; have ⟨m', h'⟩ := WHNF.of_𝕍 vw₂c'; subst h'; exact @ih' _ _ _ vw₂c'
     | @dist v₁ w₁ w₂ =>
       unfold 𝕍 at vvc ⊢; intro _ c ev₁c gt; unfold 𝕍 at vvc
       by_cases hgt₁ : GtFn w₁ <;> by_cases hgt₂ : GtFn w₂
@@ -153,7 +231,7 @@ lemma 𝔼.sub (evc : 𝔼 v c) (lt : v' ⊑ v) : 𝔼 v' c := by
   have ⟨c, ec, vvc⟩ := evc <| gtv'.sub lt; exists c, ec; exact vvc.sub lt
 
 -- https://plfa.github.io/Adequacy/#programs-with-function-denotation-terminate-via-call-by-name
-theorem 𝔼.of_eval {Γ} {γ : Env Γ} {γ' : ClosEnv Γ} {m : Γ ⊢ ✶} (g : 𝔾 γ γ') (d : γ ⊢ m ￬ v)
+theorem 𝔼.of_eval {n : Nat} {γ : Env n} {γ' : ClosEnv n} {m : Term n} (g : 𝔾 γ γ') (d : γ ⊢ m ￬ v)
 : 𝔼 v (.clos m γ')
 := by
   generalize hx : v = x at *
@@ -184,11 +262,11 @@ theorem 𝔼.of_eval {Γ} {γ : Env Γ} {γ' : ClosEnv Γ} {m : Γ ⊢ ✶} (g :
     · cases gt.conj <;> contradiction
 
 section
-  variable {m : ∅ ⊢ ✶} {n : ∅‚ ✶ ⊢ ✶}
+  variable {m : Term 0} {n : Term 1}
 
   -- https://plfa.github.io/Adequacy/#proof-of-denotational-adequacy
   theorem Eval.to_big_step (he : ℰ m = ℰ (ƛ n))
-  : ∃ (Γ : Context) (n' : Γ‚ ✶ ⊢ ✶) (γ : ClosEnv Γ), ClosEnv.empty ⊢ m ⇓ .clos (ƛ n') γ
+  : ∃ (k : Nat) (n' : Term (k + 1)) (γ : ClosEnv k), ClosEnv.empty ⊢ m ⇓ .clos (ƛ n') γ
   := by
     have : ℰ (ƛ n) ∅ (⊥ ⇾ ⊥) := by apply_rules [Eval.fn, Eval.bot]
     rw [←he] at this; have := 𝔼.of_eval 𝔾.empty this; unfold 𝔼 at this
@@ -204,13 +282,13 @@ section
   then call-by-name can produce a value.
   -/
   theorem Eval.reduce_to_cbn (rs : m —↠ ƛ n)
-  : ∃ (Δ : Context) (n' : Δ‚ ✶ ⊢ ✶) (δ : ClosEnv Δ), ClosEnv.empty ⊢ m ⇓ .clos (ƛ n') δ
+  : ∃ (k : Nat) (n' : Term (k + 1)) (δ : ClosEnv k), ClosEnv.empty ⊢ m ⇓ .clos (ƛ n') δ
   := soundness rs |> to_big_step
 end
 
-theorem Eval.reduce_iff_cbn {m : ∅ ⊢ ✶}
-: ∃ (n : ∅‚ ✶ ⊢ ✶), m —↠ ƛ n
-↔ ∃ (Δ : Context) (n' : Δ‚ ✶ ⊢ ✶) (δ : ClosEnv Δ), ClosEnv.empty ⊢ m ⇓ .clos (ƛ n') δ
+theorem Eval.reduce_iff_cbn {m : Term 0}
+: (∃ (n : Term 1), m —↠ ƛ n)
+↔ ∃ (k : Nat) (n' : Term (k + 1)) (δ : ClosEnv k), ClosEnv.empty ⊢ m ⇓ .clos (ƛ n') δ
 := by
   constructor
   · intro ⟨_, r⟩; exact reduce_to_cbn r
